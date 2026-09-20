@@ -1,0 +1,265 @@
+<Page x:Class="AccountCentre.Views.RacesPage"
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:models="using:AccountCentre.Models"
+	xmlns:converters="using:AccountCentre.Converters">
+	<Page.Resources>
+		<converters:InvertBoolConverter x:Key="InvertBoolConverter"/>
+	</Page.Resources>
+
+	<Grid>
+		<Grid.RowDefinitions>
+			<RowDefinition Height="Auto"/>
+			<RowDefinition Height="*"/>
+		</Grid.RowDefinitions>
+
+		<Grid Padding="32,32,32,12">
+			<Grid.ColumnDefinitions>
+				<ColumnDefinition Width="*"/>
+				<ColumnDefinition Width="Auto"/>
+			</Grid.ColumnDefinitions>
+
+			<StackPanel Spacing="4">
+				<TextBlock Text="Races" Style="{StaticResource TitleTextBlockStyle}"/>
+				<TextBlock x:Name="RaceCount"
+					Text="0 races"
+					Opacity="0.7"/>
+			</StackPanel>
+
+			<StackPanel Orientation="Horizontal"
+				Grid.Column="1"
+				HorizontalAlignment="Right"
+				Spacing="8"
+				VerticalAlignment="Top">
+
+				<CheckBox x:Name="OptionsAllCheckBox" IsThreeState="True"
+					Grid.Column="1"
+					Content="Select all"
+					Checked="SelectAll_Checked" Unchecked="SelectAll_Unchecked"
+					Indeterminate="SelectAll_Indeterminate"/>
+
+				<DropDownButton x:Name="BulkAction" Content="0 selected" IsEnabled="False" Visibility="Collapsed">
+					<DropDownButton.Flyout>
+						<MenuFlyout Placement="Bottom">
+							<SplitMenuFlyoutItem Text="Copy" Tag="Copy" Click="BulkAction_Click">
+								<SplitMenuFlyoutItem.Icon>
+									<FontIcon Glyph="&#xE8C8;"/>
+								</SplitMenuFlyoutItem.Icon>
+
+								<MenuFlyoutItem Text="Copy as zip" Tag="CopyAsZip" Click="BulkAction_Click">
+									<MenuFlyoutItem.Icon>
+										<FontIcon Glyph="&#xF012;"/>
+									</MenuFlyoutItem.Icon>
+								</MenuFlyoutItem>
+							</SplitMenuFlyoutItem>
+
+							<MenuFlyoutItem Text="Download"
+								Tag="Download"
+								Click="BulkAction_Click">
+								<MenuFlyoutItem.Icon>
+									<FontIcon Glyph="&#xE896;"/>
+								</MenuFlyoutItem.Icon>
+							</MenuFlyoutItem>
+
+							<MenuFlyoutSeparator/>
+
+							<MenuFlyoutItem Text="Delete"
+								Foreground="{ThemeResource SystemFillColorCriticalBrush}"
+								IsEnabled="False">
+								<MenuFlyoutItem.Icon>
+									<FontIcon Glyph="&#xE74D;"/>
+								</MenuFlyoutItem.Icon>
+							</MenuFlyoutItem>
+						</MenuFlyout>
+					</DropDownButton.Flyout>
+				</DropDownButton>
+
+			</StackPanel>
+
+			<InfoBar x:Name="BulkActionStatusBar"
+				Grid.Column="1"
+				IsOpen="False"
+				Severity="Success"
+				Message="Text copied to clipboard"
+				IsClosable="True"/>
+		</Grid>
+
+		<RefreshContainer x:Name="RefreshContainer" Grid.Row="2"
+			RefreshRequested="RefreshContainer_RefreshRequested">
+
+			<GridView x:Name="RacesGrid"
+				ItemsSource="{x:Bind Races}"
+				Padding="32,16"
+				SelectionMode="Multiple"
+				IsItemClickEnabled="False"
+				SelectionChanged="RacesGrid_SelectionChanged"
+				ContainerContentChanging="RacesGrid_ContainerContentChanging">
+				<GridView.ItemTemplate>
+					<DataTemplate x:DataType="models:Race">
+						<Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+							CornerRadius="8" Width="260"
+							Visibility="{Binding SearchVisibility}">
+							<Border.Resources>
+								<MenuFlyout x:Name="RaceActionMenu">
+
+									<MenuFlyoutItem Text="View race" Click="ViewRace_Click"
+										Visibility="{Binding Track.IsHidden, Converter={StaticResource InvertBoolConverter}}">
+										<MenuFlyoutItem.Icon>
+											<FontIcon Glyph="&#xE8A7;"/>
+										</MenuFlyoutItem.Icon>
+									</MenuFlyoutItem>
+
+									<SplitMenuFlyoutItem Text="Copy" Tag="Plain" Click="CopyRace_Click"
+										Visibility="{Binding Track.IsHidden, Converter={StaticResource InvertBoolConverter}}">
+										<SplitMenuFlyoutItem.Icon>
+											<FontIcon Glyph="&#xE8C8;"/>
+										</SplitMenuFlyoutItem.Icon>
+
+										<MenuFlyoutItem Text="Copy as file" Tag="File" Click="CopyRace_Click">
+											<MenuFlyoutItem.Icon>
+												<FontIcon Glyph="&#xE8A5;"/>
+											</MenuFlyoutItem.Icon>
+										</MenuFlyoutItem>
+									</SplitMenuFlyoutItem>
+
+									<MenuFlyoutItem Text="Download"
+										Click="DownloadRace_Click"
+										Visibility="{Binding Track.IsHidden, Converter={StaticResource InvertBoolConverter}}">
+										<MenuFlyoutItem.Icon>
+											<FontIcon Glyph="&#xE896;"/>
+										</MenuFlyoutItem.Icon>
+									</MenuFlyoutItem>
+
+									<MenuFlyoutSeparator/>
+
+									<MenuFlyoutItem Text="Delete"
+										Foreground="{ThemeResource SystemFillColorCriticalBrush}"
+										Click="DeleteRace_Click">
+										<MenuFlyoutItem.Icon>
+											<FontIcon Glyph="&#xE74D;"/>
+										</MenuFlyoutItem.Icon>
+									</MenuFlyoutItem>
+
+									<MenuFlyoutSeparator Visibility="{Binding IsDeveloperModeEnabled}"/>
+
+									<MenuFlyoutItem Text="Copy Race ID"
+										Visibility="{Binding IsDeveloperModeEnabled}"
+										Click="CopyRaceID_Click">
+										<MenuFlyoutItem.Icon>
+											<FontIcon Glyph="&#xE8C8;"/>
+										</MenuFlyoutItem.Icon>
+									</MenuFlyoutItem>
+
+								</MenuFlyout>
+							</Border.Resources>
+							<Border.ContextFlyout>
+								<StaticResource ResourceKey="RaceActionMenu"/>
+							</Border.ContextFlyout>
+
+							<StackPanel>
+
+								<Grid Height="150">
+									<Image Source="{Binding Track.DisplayThumbnailURL}"
+										Stretch="UniformToFill"/>
+
+									<Image Source="ms-appx:///Assets/featured-badge.png"
+										Height="32"
+										HorizontalAlignment="Left"
+										Margin="8"
+										VerticalAlignment="Top"
+										Visibility="{Binding IsFeatured}"
+										Width="24"/>
+
+									<Grid
+										Background="{ThemeResource AcrylicInAppFillColorDefaultBrush}"
+										CornerRadius="4"
+										HorizontalAlignment="Right"
+										Margin="8"
+										Opacity="0.8"
+										VerticalAlignment="Bottom"
+										Visibility="{Binding Track.IsHidden}">
+										<Border
+											Background="{ThemeResource SystemFillColorCriticalBrush}"
+											Opacity="0.2"
+											HorizontalAlignment="Stretch"
+											VerticalAlignment="Stretch"/>
+
+										<TextBlock
+											Text="Hidden"
+											FontSize="12"
+											FontWeight="SemiBold"
+											Foreground="{ThemeResource SystemFillColorCriticalBrush}"
+											Padding="5,2"/>
+									</Grid>
+
+									<Border
+										Background="{ThemeResource AcrylicInAppFillColorDefaultBrush}"
+										CornerRadius="4"
+										HorizontalAlignment="Right"
+										Margin="8"
+										Opacity=".6"
+										Padding="5,2"
+										VerticalAlignment="Bottom"
+										Visibility="{Binding Track.IsHidden, Converter={StaticResource InvertBoolConverter}}">
+
+										<TextBlock
+											Text="{Binding BestTime}"
+											FontSize="12"
+											FontWeight="SemiBold"/>
+
+									</Border>
+								</Grid>
+
+								<Grid Padding="16">
+
+									<Grid.ColumnDefinitions>
+										<ColumnDefinition Width="*"/>
+										<ColumnDefinition Width="Auto"/>
+									</Grid.ColumnDefinitions>
+
+									<StackPanel Spacing="4">
+
+										<TextBlock
+											Text="{Binding Track.Title}"
+											FontSize="15" FontWeight="SemiBold"
+											TextTrimming="CharacterEllipsis"/>
+
+										<StackPanel Orientation="Horizontal"
+											Spacing="4"
+											Opacity="0.6">
+
+											<FontIcon Glyph="&#xE787;"
+												FontSize="12"
+												VerticalAlignment="Center"/>
+
+											<TextBlock Text="{Binding CreatedTimeAgo}"
+												FontSize="12"
+												VerticalAlignment="Center"
+												Visibility="{Binding CreatedTimestampLoaded}"/>
+
+											<ProgressRing Height="12" Width="12"
+												VerticalAlignment="Center"
+												IsActive="{Binding CreatedTimestampLoaded, Converter={StaticResource InvertBoolConverter}}"/>
+										</StackPanel>
+
+									</StackPanel>
+
+									<Button Flyout="{StaticResource RaceActionMenu}" Grid.Column="1"
+										Height="32" Width="32" Padding="0"
+										Style="{StaticResource SubtleButtonStyle}"
+										VerticalAlignment="Center">
+
+										<FontIcon Glyph="&#xE712;"/>
+
+									</Button>
+
+								</Grid>
+
+							</StackPanel>
+						</Border>
+					</DataTemplate>
+				</GridView.ItemTemplate>
+			</GridView>
+		</RefreshContainer>
+	</Grid>
+</Page>
