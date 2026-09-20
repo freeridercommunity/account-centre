@@ -56,17 +56,38 @@ public sealed partial class RacesPage : Page, IRefreshableView, ISearchableView
 		// HiddenRaces.Clear();
 	}
 
-	public Task<List<string>?> Search(string query)
+	public async Task<List<string>?> Search(string query)
 	{
 		if (query.Length > 0)
 		{
 			var searchItems = new ObservableCollection<Race>();
 			// Fetch -- search tracks + track ID top-result if query IsFinite
 			// Filter tracks that don't have a race saved
+			var hasID = int.TryParse(query, out var id);
+			if (query.Length > 3 &&
+				hasID &&
+				!Races.Any(race => race.Track?.ID == id))
+			{
+				try
+				{
+					var trackRace = await REST.GetAsync<TrackRaceResponse>(Endpoints.TrackRace(id, App.User!.Name)) ?? throw new Exception("Track not found");
+					var raceData = trackRace?.RaceData?.FirstOrDefault() ?? throw new Exception("Race not found");
+					if (raceData.User?.ID != App.User!.ID)
+						throw new Exception("Racer is not current user");
+
+					raceData.Track = trackRace.Track;
+					searchItems.Add(new Race(raceData));
+				}
+				catch
+				{
+				}
+			}
+
 			foreach (var race in Races)
 			{
 				if (string.IsNullOrWhiteSpace(query) ||
-					race.Track?.Title?.Contains(query, StringComparison.OrdinalIgnoreCase) == true)
+					race.Track?.Title?.Contains(query, StringComparison.OrdinalIgnoreCase) == true ||
+					(hasID && race.Track?.ID == id))
 					searchItems.Add(race);
 			}
 
@@ -89,7 +110,7 @@ public sealed partial class RacesPage : Page, IRefreshableView, ISearchableView
 			// }
 		}
 
-		return Task.FromResult<List<string>?>(null);
+		return null;
 	}
 
 	private async void BulkAction_Click(object sender, RoutedEventArgs e)
@@ -278,6 +299,9 @@ public sealed partial class RacesPage : Page, IRefreshableView, ISearchableView
 			.OfType<Race>()
 			.Select<Race, Task<(string Name, string Data)?>>(async race =>
 			{
+				if (race?.Data == null)
+					return null;
+
 				var data = JsonSerializer.Serialize(race.Data);
 
 				return data is string text
@@ -343,10 +367,11 @@ public sealed partial class RacesPage : Page, IRefreshableView, ISearchableView
 	private async void ViewRace_Click(object sender, RoutedEventArgs e)
 	{
 		if (sender is not MenuFlyoutItem item ||
-			item.DataContext is not Race race)
+			item.DataContext is not Race race ||
+			race.Track == null)
 			return;
 
-		await Launcher.LaunchUriAsync(new Uri($"https://frhd.co/t/{race.Track.ID}/r/{App.User!.Name}"));
+		await Launcher.LaunchUriAsync(new Uri($"https://frhd.co/t/{race.Track.ID}/r/{race.User.Name}"));
 	}
 
 	private async void CopyRace_Click(object sender, RoutedEventArgs e)
@@ -366,6 +391,9 @@ public sealed partial class RacesPage : Page, IRefreshableView, ISearchableView
 			switch (item.Tag)
 			{
 				case "File":
+					if (race.Track == null)
+						throw new Exception("Track not loaded");
+
 					var path = Path.Combine(Path.GetTempPath(), $"{race.Track.ID}-{race.User.ID}-0.json");
 
 					await File.WriteAllTextAsync(path, text);
@@ -399,7 +427,8 @@ public sealed partial class RacesPage : Page, IRefreshableView, ISearchableView
 
 		try
 		{
-			if (race.Data is not RaceData data)
+			if (race.Data is not RaceData data ||
+				race.Track == null)
 				return;
 
 			var text = JsonSerializer.Serialize(data);
@@ -443,6 +472,9 @@ public sealed partial class RacesPage : Page, IRefreshableView, ISearchableView
 
 		try
 		{
+			if (race.Track == null)
+				throw new Exception("Track not loaded");
+
 			var confirmDialog = new ConfirmDialog
 			{
 				Content = new StackPanel
@@ -512,6 +544,9 @@ public sealed partial class RacesPage : Page, IRefreshableView, ISearchableView
 
 		try
 		{
+			if (race.Track == null)
+				throw new Exception("Track not loaded");
+
 			var package = new DataPackage();
 			package.SetText($"{race.Track.ID}/{race.User.ID}-0");
 			Clipboard.SetContent(package);
@@ -543,7 +578,8 @@ public sealed partial class RacesPage : Page, IRefreshableView, ISearchableView
 			race.OnPropertyChanged("CreatedTimestampLoaded");
 		}
 
-		await race.Track.CacheThumbnailAsync();
+		if (race.Track != null)
+			await race.Track.CacheThumbnailAsync();
 	}
 
 	private async Task RefreshRacesAsync()

@@ -184,6 +184,7 @@ public sealed partial class SettingsPage : Page
 			if (authResult != ReauthenticateDialogResult.Authenticated)
 				return;
 
+			var password = authDialog.Password;
 			var newEmail = new TextBox
 			{
 				PlaceholderText = "Enter new email"
@@ -217,7 +218,14 @@ public sealed partial class SettingsPage : Page
 			var result = await dialog.ShowAsync();
 			if (result == ContentDialogResult.Primary)
 			{
-				await RESTExtended.PatchAsync(Endpoints.Email());
+				await RESTExtended.PatchAsync(
+					Endpoints.Email(),
+					new
+					{
+						email = newEmail.Text,
+						password
+					}
+				);
 			}
 		}
 		catch (Exception ex)

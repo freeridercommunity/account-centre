@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Net;
 using System.Net.Http.Json;
 using System.Security.Cryptography;
@@ -16,7 +17,7 @@ public static class UpdateManager
 			? "Never"
 			: LastChecked.Value.LocalDateTime.ToString("MMM d, yyyy h:mm tt");
 	private const string Owner = "freeridercommunity";
-	private const string Repository = "account-control.win";
+	private const string Repository = "account-centre";
 	private const string Installer = "Setup-FreeRiderCommunityAccountCentre-x64.exe";
 	private static readonly HttpClient Client = new()
 	{
@@ -45,8 +46,8 @@ public static class UpdateManager
 			return null;
 
 		var isNewer = IsNewer(release.TagName);
-		// if (!isNewer)
-		// 	return null;
+		if (!isNewer)
+			return null;
 
 		LatestRelease = release;
 		return LatestRelease;
@@ -70,6 +71,12 @@ public static class UpdateManager
 		);
 
 		if (!File.Exists(path))
+			return null;
+
+		var info = FileVersionInfo.GetVersionInfo(path);
+
+		if (!Version.TryParse(info.ProductVersion, out var productVersion) ||
+			!IsNewer(productVersion.ToString()))
 			return null;
 
 		if (await VerifyAssetHashAsync(path, installer.Digest))
@@ -188,7 +195,14 @@ public static class UpdateManager
 		);
 		var exists = File.Exists(path);
 		if (exists)
+		{
+			var info = FileVersionInfo.GetVersionInfo(path);
+			if (!Version.TryParse(info.ProductVersion, out var productVersion) ||
+				!IsNewer(productVersion.ToString()))
+				return false;
+
 			InstallerPath = path;
+		}
 
 		return exists;
 	}

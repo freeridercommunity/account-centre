@@ -12,7 +12,6 @@ public static class AuthManager
 	public static async Task Initialize()
 	{
 		var token = TokenSecret.Get();
-
 		if (token == null)
 			return;
 
@@ -26,10 +25,7 @@ public static class AuthManager
 	public static async Task Login(string login, string password)
 	{
 		var response = await LoginAsync(login, password);
-		var token = response.Token;
-
-		if (token == null ||
-			token is not string)
+		if (response.Token is not string token)
 			throw new Exception("Invalid token");
 
 		TokenSecret.Set(token);
@@ -58,7 +54,7 @@ public static class AuthManager
 			"auth/standard_login",
 			new { login, password }
 		) ?? throw new Exception("The response contained no data.");
-		if (response?.Result is false)
+		if (response.Result == false)
 			throw new Exception(response.Message);
 
 		return response;

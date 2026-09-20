@@ -12,10 +12,11 @@ using Windows.System;
 
 namespace AccountCentre.Views;
 
-using AccountCentre.Core;
 using Components;
+using Core;
 using Models;
 using Networking;
+using Networking.Models;
 using Networking.Responses;
 
 public sealed partial class CreatedPage : Page, IRefreshableView, ISearchableView
@@ -63,13 +64,12 @@ public sealed partial class CreatedPage : Page, IRefreshableView, ISearchableVie
 				try
 				{
 					var top = await REST.GetAsync<TrackAPIResponse>(Endpoints.TrackData(id));
-					if (top != null &&
-						top.Result &&
-						top?.Data?.Track is not null &&
-						top.Data.Track.AuthorID == App.User.ID)
-					{
-						searchItems.Add(new CreatedTrack(top?.Data?.Track));
-					}
+					if (top?.Data?.Track is not TrackData track)
+						throw new Exception("Track not found");
+					if (track.AuthorID != App.User!.ID)
+						throw new Exception("Track author is not current user");
+
+					searchItems.Add(new CreatedTrack(track));
 				}
 				catch
 				{

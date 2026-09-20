@@ -11,11 +11,11 @@ using Networking.ExtendedAPI;
 
 public sealed record Race : Base
 {
-	public string BestTime { get; set; }
+	public string BestTime { get; set; } = "";
 	public RaceData? Data { get; set; }
 	public Visibility SearchVisibility { get; set; } = Visibility.Visible;
 	public Track? Track { get; set; }
-	public User? User { get; set; }
+	public User User { get; set; }
 	public long? CreatedTimestamp { get; internal set; }
 	public bool CreatedTimestampLoaded =>
 		CreatedTimestamp > 0;
@@ -48,8 +48,11 @@ public sealed record Race : Base
 		// if (race.User != null)
 		// 	User.Patch(race.User);
 
-		BestTime = TicksToTime(1_000 * race.Data.Ticks / 30);
-		Data = race.Data;
+		if (race.Data != null)
+		{
+			BestTime = TicksToTime(1_000 * race.Data.Ticks / 30);
+			Data = race.Data;
+		}
 	}
 
 	public async Task<UserTrackStats> FetchStats()
@@ -62,13 +65,16 @@ public sealed record Race : Base
 		if (response.UserTrackStats is not UserTrackStats stats)
 			throw new Exception("Response body is empty");
 
-		var date = DateTime.ParseExact(
-			stats.BestDate,
-			"dd/MM/yyyy",
-			CultureInfo.InvariantCulture,
-			DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal
-		);
-		CreatedTimestamp = new DateTimeOffset(date).ToUnixTimeSeconds();
+		if (stats.BestDate != null)
+		{
+			var date = DateTime.ParseExact(
+				stats.BestDate,
+				"dd/MM/yyyy",
+				CultureInfo.InvariantCulture,
+				DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal
+			);
+			CreatedTimestamp = new DateTimeOffset(date).ToUnixTimeSeconds();
+		}
 
 		return stats;
 	}
@@ -78,7 +84,7 @@ public sealed record Race : Base
 		await RESTExtended.DeleteAsync(Networking.ExtendedAPI.Endpoints.Race(ID));
 	}
 
-	private string TicksToTime(uint ticks)
+	private static string TicksToTime(uint ticks)
 	{
 		var minutes = ticks / 60_000;
 		var seconds = ticks % 60_000 / 1_000.0;

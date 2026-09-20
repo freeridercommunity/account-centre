@@ -128,10 +128,11 @@ public sealed partial class MainWindow : Window
 
 	private void TitleBar_SearchSuggestionChosen(AutoSuggestBox sender, AutoSuggestBoxSuggestionChosenEventArgs args)
 	{
-		if (ContentFrame.Content is not ISearchableView searchable)
+		if (ContentFrame.Content is not ISearchableView searchable ||
+			args.SelectedItem.ToString() is not string selected)
 			return;
 
-		searchable.SearchSuggestionChosen(args.SelectedItem.ToString());
+		searchable.SearchSuggestionChosen(selected);
 
 	}
 

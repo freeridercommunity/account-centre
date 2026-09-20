@@ -13,8 +13,21 @@ public sealed class TrackRaceResponse : BasePageResponse
 	[JsonPropertyName("user_track_stats")]
 	public UserTrackStats? UserTrackStats { get; init; }
 
+	[JsonPropertyName("race_data")]
+	public RaceEntryData[] RaceData { get; private set; } = [];
+
+	[JsonInclude]
 	[JsonPropertyName("game_settings")]
-	public GameSettings? GameSettings { get; init; }
+	private GameSettings GameSettings
+	{
+		init
+		{
+			if (value?.RaceData == null)
+				return;
+
+			this.RaceData = value.RaceData;
+		}
+	}
 }
 
 public sealed record UserTrackStats
@@ -75,6 +88,6 @@ public sealed record UserTrackStats
 public sealed class GameSettings
 {
 	[JsonPropertyName("raceData")]
-	public RaceData[]? Races { get; init; }
+	public RaceEntryData[]? RaceData { get; init; }
 
 }

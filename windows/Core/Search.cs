@@ -30,7 +30,7 @@ public static class Search
 	{
 		var response = await REST.PostAsync<UMentionLookupAPIResponse>($"search/u_mention_lookup/{query}");
 
-		if (response == null)
+		if (response?.Data == null)
 			throw new Exception("Response returned no data");
 
 		return response.Data;

@@ -62,7 +62,7 @@ public record TrackData : BaseData<TrackData>
 	public TrackPowerupData? Powerups { get; init; }
 
 	[JsonPropertyName("img")]
-	public string? ThumbnailURL { get; private set; }
+	public string? ThumbnailURL { get; init; }
 
 	[JsonInclude]
 	[JsonPropertyName("thmb")]
