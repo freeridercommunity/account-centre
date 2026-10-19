@@ -5,7 +5,6 @@
 	xmlns:converters="using:AccountCentre.Converters">
 	<Page.Resources>
 		<converters:FriendActivityToStatusStyleConverter x:Key="FriendActivityToStatusStyleConverter"/>
-		<converters:InvertBoolConverter x:Key="InvertBoolConverter"/>
 	</Page.Resources>
 
 	<Grid>
@@ -32,15 +31,21 @@
 				Grid.Column="1"
 				Spacing="8"
 				VerticalAlignment="Top">
+				<Button Style="{StaticResource SubtleButtonStyle}"
+					Click="OpenFriendRequestsDialog_Click">
+					<StackPanel Orientation="Horizontal" Spacing="8">
+						<FontIcon Glyph="&#xE716;"/>
+						<TextBlock Text="Requests"/>
+					</StackPanel>
+				</Button>
 
 				<Button Style="{StaticResource AccentButtonStyle}"
 					Click="OpenAddFriendDialog_Click">
 					<StackPanel Orientation="Horizontal" Spacing="8">
-						<FontIcon Glyph="&#xE710;"/>
+						<FontIcon Glyph="&#xE8FA;"/>
 						<TextBlock Text="Add Friend"/>
 					</StackPanel>
 				</Button>
-
 			</StackPanel>
 		</Grid>
 
@@ -62,25 +67,20 @@
 			IsOpen="False"
 			IsClosable="True"/> -->
 
-		<RefreshContainer x:Name="RefreshContainer"
-			Grid.Row="2"
+		<RefreshContainer Grid.Row="1" x:Name="RefreshContainer"
 			RefreshRequested="RefreshContainer_RefreshRequested">
 			<ScrollViewer Padding="32,16">
-				<ItemsRepeater ItemsSource="{x:Bind Friends}">
+				<ItemsRepeater ItemsSource="{x:Bind Friends, Mode=OneWay}">
 					<ItemsRepeater.Layout>
 						<StackLayout Spacing="8"/>
 					</ItemsRepeater.Layout>
 					<ItemsRepeater.ItemTemplate>
 						<DataTemplate x:DataType="models:Friend">
-							<Border
-								Padding="16"
-								CornerRadius="8"
-								Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+							<Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+								CornerRadius="8" Padding="16">
 								<Border.Resources>
 									<MenuFlyout x:Name="FriendMenu">
-										<MenuFlyoutItem
-											Text="View profile"
-											Click="ViewProfile_Click">
+										<MenuFlyoutItem Text="View profile" Click="ViewProfile_Click">
 											<MenuFlyoutItem.Icon>
 												<FontIcon Glyph="&#xE8A7;"/>
 											</MenuFlyoutItem.Icon>
@@ -88,8 +88,7 @@
 
 										<MenuFlyoutSeparator/>
 
-										<MenuFlyoutItem
-											Text="Remove"
+										<MenuFlyoutItem Text="Remove"
 											Foreground="{ThemeResource SystemFillColorCriticalBrush}"
 											Click="RemoveFriend_Click">
 											<MenuFlyoutItem.Icon>
@@ -98,7 +97,6 @@
 										</MenuFlyoutItem>
 									</MenuFlyout>
 								</Border.Resources>
-
 								<Border.ContextFlyout>
 									<StaticResource ResourceKey="FriendMenu"/>
 								</Border.ContextFlyout>
@@ -110,13 +108,12 @@
 									</Grid.ColumnDefinitions>
 
 									<StackPanel Orientation="Horizontal" Spacing="16">
-
 										<Grid>
-											<Border CornerRadius="20" VerticalAlignment="Center">
-												<Image Source="{Binding AvatarURL}"
-													Height="40"
-													Width="40"/>
-											</Border>
+											<PersonPicture ProfilePicture="{Binding DisplayAvatarURL, FallbackValue='ms-appx:///Assets/default-avatar.png', TargetNullValue='ms-appx:///Assets/default-avatar.png'}"
+												CornerRadius="20"
+												Height="40"
+												VerticalAlignment="Center"
+												Width="40"/>
 
 											<InfoBadge Style="{Binding ActivityTimestamp, Converter={StaticResource FriendActivityToStatusStyleConverter}}"
 												Height="12"
@@ -130,7 +127,6 @@
 											Grid.Column="1"
 											Spacing="3"
 											VerticalAlignment="Center">
-
 											<TextBlock
 												Text="{Binding DisplayName}"
 												FontSize="15"
@@ -140,9 +136,7 @@
 												Text="{Binding ActivityTimeAgo}"
 												FontSize="12"
 												Opacity="0.6"/>
-
 										</StackPanel>
-
 									</StackPanel>
 
 									<StackPanel
@@ -150,14 +144,11 @@
 										Orientation="Horizontal"
 										Spacing="12"
 										VerticalAlignment="Center">
-
 										<Button Flyout="{StaticResource FriendMenu}"
 											Style="{StaticResource SubtleButtonStyle}">
 											<FontIcon Glyph="&#xE712;"/>
 										</Button>
-
 									</StackPanel>
-
 								</Grid>
 							</Border>
 						</DataTemplate>

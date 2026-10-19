@@ -1,114 +1,130 @@
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
+using System.Text;
 
 namespace AccountCentre;
 
 using Core;
+using Core.Sessions;
 using Core.Settings;
-using Models;
-using Networking;
-using Networking.Models;
-using Networking.Responses;
+using Core.Storage;
 using Windows;
 
 public partial class App : Application
 {
-	public static readonly string IconPath = Path.Combine(
-		AppContext.BaseDirectory,
-		"Assets",
-		"app.ico"
-	);
-
-	public static ClientUser? User { get; internal set; }
-
-	private Window? authWindow;
-	private Window? window;
-
+	public static readonly string IconPath = Path.Combine(AppContext.BaseDirectory, "Assets", "app.ico");
 	public App()
 	{
 		InitializeComponent();
 
 		SettingsManager.Load();
-
 		// ProtocolRegistration.Register();
-
-		AuthManager.LogOut += (_, _) => HandleLogout();
+		AuthManager.LoggedOut += (_, _) => HandleLogout();
 	}
 
 	protected override async void OnLaunched(LaunchActivatedEventArgs args)
 	{
 		if (SettingsManager.Current.CheckForUpdatesAtStartup)
-		{
 			_ = UpdateManager.CheckAsync();
+
+		if (SettingsManager.Current.StartupAccountBehavior == 0)
+		{
+			// Get most recently modified file
+			var key = SecretStore.EnumerateSecrets("Sessions")?.FirstOrDefault();
+			var tokenData = key != null ? SecretStore.Get(key, "Sessions") : null;
+			var token = tokenData != null ? Encoding.UTF8.GetString(tokenData) : null;
+			if (token != null)
+			{
+				// Add try/catch block
+				try
+				{
+					var session = await AuthManager.Login(token);
+					CreateMainWindow(session);
+					return;
+				}
+				catch (AuthFailedException)
+				{
+					SecretStore.ClearValue(key!, "Sessions");
+				}
+			}
 		}
 
 		await TriggerLoginFlow();
 	}
 
-	private async Task TriggerLoginFlow()
+	public static async Task SwitchAccounts(string? username = null)
 	{
-		if (User is null)
+		if (username != null)
 		{
-			var token = TokenSecret.Get();
-
-			// token = null;
-
-			if (token == null)
+			var tokenData = SecretStore.Get(username, "Sessions");
+			if (tokenData != null &&
+				Encoding.UTF8.GetString(tokenData) is string token)
 			{
-				var authWindow = new AuthWindow();
-				authWindow.AppWindow.SetIcon(IconPath);
-				authWindow.AppWindow.TitleBar.PreferredTheme = TitleBarTheme.UseDefaultAppMode;
-				authWindow.Activate();
-
-				var authenticated = await authWindow.WaitForAuthenticationAsync();
-
-				if (!authenticated)
+				var session = await AuthManager.Login(token);
+				if (session != null)
+				{
+					CreateMainWindow(session);
 					return;
- 
-				token = TokenSecret.Get();
-				if (token == null)
-					return;
-
-				this.authWindow = authWindow;
+				}
 			}
-
-			await AuthManager.Initialize();
-			// AuthManager.Init replace REST.SetToken
-			// REST.SetToken(token);
-			await InitializeUser();
 		}
 
-		window = new MainWindow();
-		window.AppWindow.SetIcon(IconPath);
-		window.AppWindow.TitleBar.PreferredTheme = TitleBarTheme.UseDefaultAppMode;
-		window.Activate();
+		var authWindow = CreateAuthWindow(username);
+		var cancelled = await TriggerLoginFlow(authWindow);
+		if (cancelled)
+			throw new Exception("Operation cancelled");
+	}
 
+	private static void HandleLogout()
+		=> _ = TriggerLoginFlow();
+
+	private static async Task<bool> TriggerLoginFlow(AuthWindow? authWindow = null)
+	{
+		authWindow ??= CreateAuthWindow();
+
+		var session = await authWindow.WaitForAuthenticationAsync();
+		if (session == null)
+			return true;
+
+		CreateMainWindow(session);
 		if (authWindow != null)
 		{
 			authWindow.Close();
 			authWindow = null;
 		}
+
+		return false;
 	}
 
-	private async Task InitializeUser()
+	private static AuthWindow? authWindow;
+	private static AuthWindow CreateAuthWindow(string? username = null)
 	{
-		var response = await REST.GetAsync<AccountPageResponse>(Endpoints.Account());
-		if (response?.User is not ClientUserData user)
-			return;
-
-		User = new ClientUser(user);
-	}
-
-	private void HandleLogout()
-	{
-		User = null;
-
-		_ = TriggerLoginFlow();
-
-		if (window != null)
+		if (authWindow == null)
 		{
-			window?.Close();
-			window = null;
+			authWindow = new(username);
+			authWindow.AppWindow.SetIcon(IconPath);
+			authWindow.AppWindow.TitleBar.PreferredTheme = TitleBarTheme.UseDefaultAppMode;
+			authWindow.Closed += (_, _) => authWindow = null;
 		}
+
+		authWindow.Activate();
+		return authWindow;
+	}
+
+	private static MainWindow CreateMainWindow(Session session)
+	{
+		MainWindow window = new(session);
+		window.AppWindow.SetIcon(IconPath);
+		window.AppWindow.TitleBar.PreferredTheme = TitleBarTheme.UseDefaultAppMode;
+
+		session.Invalidated += (_, _) =>
+		{
+			CreateAuthWindow();
+			window.Close();
+			// _ = TriggerLoginFlow(authWindow);
+		};
+
+		window.Activate();
+		return window;
 	}
 }

@@ -1,24 +1,65 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Navigation;
 using System.Collections.ObjectModel;
 using Windows.System;
 
 namespace AccountCentre.Views;
 
-using AccountCentre.Core;
-using Components;
+using AccountCentre.Core.Services;
+using Behaviors;
+using Components.Dialogs;
+using Core.Sessions;
+using Interfaces;
 using Models;
 using Networking;
 using Networking.Responses;
 
-public sealed partial class FriendsPage : Page, IRefreshableView
+public sealed partial class FriendsPage : Page, IRefreshableView, ISessionAware
 {
-	public ObservableCollection<Friend> Friends { get; } = [];
+	public Session Session { get; set; } = null!;
+	public bool IsCurrentUser { get; private set; } = false;
+	public ObservableCollection<Friend> Friends { get; private set; } = [];
+	private readonly Dictionary<ulong, ObservableCollection<Friend>> _friendCache = [];
+	private User User = null!;
 	public FriendsPage()
 	{
+		this.NavigationCacheMode = NavigationCacheMode.Enabled;
+
 		InitializeComponent();
 
 		_ = RefreshFriendsAsync();
+	}
+
+	protected override void OnNavigatedTo(NavigationEventArgs e)
+	{
+		base.OnNavigatedTo(e);
+		if (e.Parameter is not User user)
+		{
+			// this.User = null;
+			return;
+		}
+
+		// Check friend requests
+		this.User = user;
+		this.IsCurrentUser = user.ID == Session.User!.ID;
+		// Bindings.Update();
+
+		// Bandaid solution
+		// if (Friends.Count == 0)
+		// 	_ = RefreshFriendsAsync();
+
+		if (_friendCache.TryGetValue(user.ID, out var cached))
+			Friends = cached;
+		else
+		{
+			Friends = [];
+			Bindings.Update();
+
+			_friendCache[user.ID] = Friends;
+
+			_ = RefreshFriendsAsync();
+		}
 	}
 
 	private TaskCompletionSource? _refreshCompletion;
@@ -32,128 +73,54 @@ public sealed partial class FriendsPage : Page, IRefreshableView
 		await _refreshCompletion.Task;
 	}
 
+	private async void OpenFriendRequestsDialog_Click(object sender, RoutedEventArgs e)
+	{
+		if (sender is not Button button)
+			return;
+
+		button.IsEnabled = false;
+
+		try
+		{
+			var dialog = new FriendRequestsDialog(Session)
+			{
+				XamlRoot = this.XamlRoot
+			};
+			await dialog.ShowAsync();
+		}
+		catch (Exception ex)
+		{
+			ErrorService.Tip(button, ex.Message);
+		}
+		finally
+		{
+			button.IsEnabled = true;
+		}
+	}
+
 	private async void OpenAddFriendDialog_Click(object sender, RoutedEventArgs e)
 	{
-		ContentDialog dialog = new ContentDialog
+		if (sender is not Button button)
+			return;
+
+		button.IsEnabled = false;
+
+		try
 		{
-			XamlRoot = this.XamlRoot,
-			Style = Application.Current.Resources["DefaultContentDialogStyle"] as Style,
-			Title = "Add Friend",
-			PrimaryButtonText = "Send",
-			IsPrimaryButtonEnabled = false,
-			CloseButtonText = "Cancel",
-			DefaultButton = ContentDialogButton.Primary
-		};
-
-		// var input = new TextBox
-		var input = new AutoSuggestBox
+			var dialog = new AddFriendDialog(Session)
+			{
+				XamlRoot = this.XamlRoot
+			};
+			await dialog.ShowAsync();
+		}
+		catch (Exception ex)
 		{
-			PlaceholderText = "Username"
-		};
-
-		var infoBar = new InfoBar
+			ErrorService.Tip(button, ex.Message);
+		}
+		finally
 		{
-			IsOpen = false,
-			Severity = InfoBarSeverity.Error,
-			Title = "Unable to send friend request"
-		};
-
-		input.SuggestionChosen += (_, _) =>
-		{
-			dialog.IsPrimaryButtonEnabled = true;
-		};
-
-		input.TextChanged += async (AutoSuggestBox sender, AutoSuggestBoxTextChangedEventArgs args) =>
-		{
-			infoBar.IsOpen = false;
-			dialog.IsPrimaryButtonEnabled = input.Text.Length >= 3;
-
-			if (sender.Text.Length < 3)
-			{
-				sender.ItemsSource = null;
-				return;
-			}
-
-			var suggestions = new List<string>();
-			try
-			{
-				var results = await Search.User(sender.Text);
-
-				foreach (var data in results)
-					suggestions.Add(data.DisplayName);
-			}
-			finally
-			{
-				sender.ItemsSource = suggestions;
-			}
-		};
-
-		dialog.Content = new StackPanel
-		{
-			Spacing = 8,
-			Children =
-			{
-				input,
-				infoBar
-			}
-		};
-
-		dialog.PrimaryButtonClick += async (_, args) =>
-		{
-			dialog.IsPrimaryButtonEnabled = false;
-
-			var username = input.Text.Trim();
-			if (username.Length < 3)
-			{
-				args.Cancel = true;
-
-				infoBar.Message = "Username must be 3 characters or greater";
-				infoBar.IsOpen = true;
-				return;
-			}
-
-			var deferral = args.GetDeferral();
-
-			try
-			{
-				var response = await REST.PostAsync<APIResponse>(
-					"friends/send_friend_request",
-					new
-					{
-						u_name = username
-					}
-				);
-
-				if (response?.Result is false)
-					throw new Exception(response.Message);
-			}
-			catch (Exception ex)
-			{
-				args.Cancel = true;
-
-				infoBar.Message = ex.Message;
-				infoBar.IsOpen = true;
-			}
-			finally
-			{
-				deferral.Complete();
-			}
-		};
-
-		await dialog.ShowAsync();
-		// var result = await dialog.ShowAsync();
-
-		// if (result == ContentDialogResult.Primary)
-		// {
-		// 	FriendRequestSentInfoBar.IsOpen = true;
-
-		// 	_ = Task.Delay(3000).ContinueWith(_ =>
-		// 	{
-		// 		DispatcherQueue.TryEnqueue(() =>
-		// 			FriendRequestSentInfoBar.IsOpen = false
-		// 		);
-		// 	});
-		// }
+			button.IsEnabled = true;
+		}
 	}
 
 	private async void ViewProfile_Click(object sender, RoutedEventArgs e)
@@ -175,7 +142,7 @@ public sealed partial class FriendsPage : Page, IRefreshableView
 
 		try
 		{
-			await friend.Remove();
+			await friend.Remove(Session.Rest);
 			Friends.Remove(friend);
 			// Clear friend-related cache entries
 		}
@@ -192,11 +159,11 @@ public sealed partial class FriendsPage : Page, IRefreshableView
 
 	private async Task RefreshFriendsAsync()
 	{
-		var response = await REST.GetAsync<UserPageResponse>(App.User!.Name);
+		var response = await REST.GetAsync<UserPageFriendsResponse>(Routes.UserFriends(this.User!.Name));
 
 		Friends.Clear();
 
-		var friends = response?.Friends?.Data;
+		var friends = response?.Data;
 		if (friends is null)
 			return;
 
@@ -204,6 +171,10 @@ public sealed partial class FriendsPage : Page, IRefreshableView
 			Friends.Add(new Friend(friend));
 
 		this.FriendCount.Text = $"{Friends.Count} friends";
+
+		// Friend requests
+		// Update nav tab badge count with
+		// var friendRequestCount = response.FriendRequests.Data.Length;
 	}
 
 	private async void RefreshContainer_RefreshRequested(RefreshContainer sender, RefreshRequestedEventArgs args)

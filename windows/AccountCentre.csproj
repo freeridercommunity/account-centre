@@ -7,7 +7,6 @@
 
 		<ApplicationIcon>..\assets\app.ico</ApplicationIcon>
 		<ApplicationManifest>app.manifest</ApplicationManifest>
-		<ApplicationVersion>1.0.0</ApplicationVersion>
 
 		<Platforms>x64</Platforms>
 		<RuntimeIdentifier>win-x64</RuntimeIdentifier>
@@ -23,6 +22,8 @@
 		<SelfContained>true</SelfContained>
 		<WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
 		<WindowsPackageType>None</WindowsPackageType>
+
+		<Version>1.0.1</Version>
 	</PropertyGroup>
 
 	<ItemGroup>
@@ -33,6 +34,6 @@
 
 		<PackageReference Include="Microsoft.WindowsAppSDK" Version="2.5.1" />
 		<PackageReference Include="CommunityToolkit.WinUI.Controls.SettingsControls" Version="8.*" />
-		<PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.12" />
+		<PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.13" />
 	</ItemGroup>
 </Project>

@@ -2,6 +2,7 @@ using Microsoft.UI.Text;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Documents;
+using Microsoft.UI.Xaml.Navigation;
 using Microsoft.Windows.Storage.Pickers;
 using System.Collections.ObjectModel;
 using System.IO.Compression;
@@ -14,23 +15,70 @@ using Windows.System;
 namespace AccountCentre.Views;
 
 using Core;
-using Components;
+using Core.Sessions;
+using Core.Settings;
+using Components.Dialogs;
+using Interfaces;
 using Models;
 using Networking;
 using Networking.Models;
 using Networking.Responses;
 
-public sealed partial class RacesPage : Page, IRefreshableView, ISearchableView
+public sealed partial class RacesPage : Page, IRefreshableView, ISearchableView, ISessionAware
 {
-	// public List<Race> HiddenRaces { get; } = [];
-	public ObservableCollection<Race> Races { get; } = [];
+	public Session Session { get; set; } = null!;
+	public bool IsCurrentUser { get; private set; } = false;
+	public bool IsDeveloperModeEnabled => SettingsManager.Current.DeveloperMode;
+	private readonly Dictionary<ulong, ObservableCollection<Race>> _raceCache = [];
+	public ObservableCollection<Race> Races { get; private set; } = [];
+	public User? User;
 	public RacesPage()
 	{
+		this.NavigationCacheMode = NavigationCacheMode.Enabled;
+
 		InitializeComponent();
 
 		_ = RefreshRacesAsync();
+	}
 
-		// this.RaceCount.Text = $"{App.User.Stats.Completed} races";
+	protected override void OnNavigatedTo(NavigationEventArgs e)
+	{
+		base.OnNavigatedTo(e);
+		if (e.Parameter is not ClientUser user)
+		{
+			this.User = null;
+			return;
+		}
+
+		this.User = user;
+		this.IsCurrentUser = user.ID == Session.User!.ID;
+		// Bindings.Update();
+
+		if (_raceCache.TryGetValue(user.ID, out var cached))
+			Races = cached;
+		else
+		{
+			Races = [];
+			Bindings.Update();
+
+			_raceCache[user.ID] = Races;
+
+			_ = RefreshRacesAsync();
+		}
+
+		_ = UpdateRaceCount((uint)Races.Count);
+	}
+
+	private async Task UpdateRaceCount(uint count = 0)
+	{
+		if (this.User == null)
+			return;
+
+		var userStats = await User.FetchStats();
+		if (userStats == null)
+			return;
+
+		this.RaceCount.Text = $"{count} of {userStats.Completed} races";
 	}
 
 	private TaskCompletionSource? _refreshCompletion;
@@ -47,13 +95,7 @@ public sealed partial class RacesPage : Page, IRefreshableView, ISearchableView
 	public void ClearSearch()
 	{
 		RacesGrid.ItemsSource = Races;
-
-		// foreach (var race in HiddenRaces)
-		// {
-		// 	Races.Add(race);
-		// }
-
-		// HiddenRaces.Clear();
+		_ = UpdateRaceCount((uint)Races.Count);
 	}
 
 	public async Task<List<string>?> Search(string query)
@@ -61,18 +103,16 @@ public sealed partial class RacesPage : Page, IRefreshableView, ISearchableView
 		if (query.Length > 0)
 		{
 			var searchItems = new ObservableCollection<Race>();
-			// Fetch -- search tracks + track ID top-result if query IsFinite
-			// Filter tracks that don't have a race saved
-			var hasID = int.TryParse(query, out var id);
+			var hasID = ulong.TryParse(query, out var id);
 			if (query.Length > 3 &&
 				hasID &&
 				!Races.Any(race => race.Track?.ID == id))
 			{
 				try
 				{
-					var trackRace = await REST.GetAsync<TrackRaceResponse>(Endpoints.TrackRace(id, App.User!.Name)) ?? throw new Exception("Track not found");
+					var trackRace = await REST.GetAsync<TrackRaceResponse>(Routes.TrackRace(id, this.User!.Name)) ?? throw new Exception("Track not found");
 					var raceData = trackRace?.RaceData?.FirstOrDefault() ?? throw new Exception("Race not found");
-					if (raceData.User?.ID != App.User!.ID)
+					if (raceData.User?.ID != this.User!.ID)
 						throw new Exception("Racer is not current user");
 
 					raceData.Track = trackRace.Track;
@@ -92,22 +132,7 @@ public sealed partial class RacesPage : Page, IRefreshableView, ISearchableView
 			}
 
 			RacesGrid.ItemsSource = searchItems;
-
-			// ClearSearch();
-
-			// foreach (var race in Races)
-			// {
-			// 	if (string.IsNullOrWhiteSpace(query) ||
-			// 		race.Track?.Title?.Contains(query, StringComparison.OrdinalIgnoreCase) == true)
-			// 		continue;
-
-			// 	HiddenRaces.Add(race);
-			// }
-
-			// foreach (var race in HiddenRaces)
-			// {
-			// 	Races.Remove(race);
-			// }
+			_ = UpdateRaceCount((uint)searchItems.Count);
 		}
 
 		return null;
@@ -305,7 +330,7 @@ public sealed partial class RacesPage : Page, IRefreshableView, ISearchableView
 				var data = JsonSerializer.Serialize(race.Data);
 
 				return data is string text
-					? (Name: Utils.SanitizeFileName($"{race.Track?.ID}-{race.User.ID /* ?? App.User.ID */}-0"), Data: text)
+					? (Name: Utils.SanitizeFileName($"{race.Track?.ID}-{race.User.ID /* ?? this.User.ID */}-0"), Data: text)
 					: null;
 			});
 
@@ -322,11 +347,10 @@ public sealed partial class RacesPage : Page, IRefreshableView, ISearchableView
 		return races;
 	}
 
-	private void SelectAll_Checked(object sender, RoutedEventArgs e) =>
-		RacesGrid.SelectAll();
-
-	private void SelectAll_Unchecked(object sender, RoutedEventArgs e) =>
-		RacesGrid.SelectedItems.Clear();
+	private void SelectAll_Checked(object sender, RoutedEventArgs e)
+		=> RacesGrid.SelectAll();
+	private void SelectAll_Unchecked(object sender, RoutedEventArgs e)
+		=> RacesGrid.SelectedItems.Clear();
 
 	private void SelectAll_Indeterminate(object sender, RoutedEventArgs e)
 	{
@@ -339,13 +363,8 @@ public sealed partial class RacesPage : Page, IRefreshableView, ISearchableView
 		RacesGrid.SelectedItems.Clear();
 	}
 
-	private void RacesGrid_SelectionChanged(
-		object sender,
-		SelectionChangedEventArgs e)
-	{
-		UpdateSelectAllState();
-	}
-
+	private void RacesGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
+		=> UpdateSelectAllState();
 	private void UpdateSelectAllState()
 	{
 		var count = RacesGrid.Items.Count;
@@ -444,7 +463,6 @@ public sealed partial class RacesPage : Page, IRefreshableView, ISearchableView
 			picker.FileTypeChoices.Add("Race Files", new List<string>() { ".json" });
 
 			var result = await picker.PickSaveFileAsync();
-
 			if (result == null)
 				return;
 
@@ -469,7 +487,6 @@ public sealed partial class RacesPage : Page, IRefreshableView, ISearchableView
 			return;
 
 		item.IsEnabled = false;
-
 		try
 		{
 			if (race.Track == null)
@@ -516,7 +533,7 @@ public sealed partial class RacesPage : Page, IRefreshableView, ISearchableView
 			var result = await confirmDialog.ShowAsync();
 			if (result == ContentDialogResult.Primary)
 			{
-				await race.Delete();
+				await race.Delete(Session.RestExtended);
 				Races.Remove(race);
 			}
 		}
@@ -541,7 +558,6 @@ public sealed partial class RacesPage : Page, IRefreshableView, ISearchableView
 			return;
 
 		item.IsEnabled = false;
-
 		try
 		{
 			if (race.Track == null)
@@ -571,24 +587,46 @@ public sealed partial class RacesPage : Page, IRefreshableView, ISearchableView
 			args.Item is not Race race)
 			return;
 
-		if (race.CreatedTimestamp is null)
+		try
 		{
-			await race.FetchStats();
-			race.OnPropertyChanged("CreatedTimeAgo");
-			race.OnPropertyChanged("CreatedTimestampLoaded");
-		}
+			if (race.CreatedTimestamp is null)
+			{
+				await race.FetchStats(Session.Rest);
+				race.OnPropertyChanged("CreatedTimeAgo");
+				race.OnPropertyChanged("CreatedTimestampLoaded");
+			}
 
-		if (race.Track != null)
-			await race.Track.CacheThumbnailAsync();
+			if (!race.IsFeaturedLoaded)
+			{
+				try
+				{
+					await race.FetchFeatured();
+					race.OnPropertyChanged("IsFeatured");
+				}
+				catch
+				{
+					// Show error on it "(X) Failed to load"
+				}
+			}
+
+			if (race.Track != null)
+				_ = race.Track.CacheThumbnailAsync();
+		}
+		catch (Exception ex)
+		{
+			System.Diagnostics.Debug.WriteLine(ex.Message);
+			// Show error inline
+			// (x) Error: ex.Message
+		}
 	}
 
 	private async Task RefreshRacesAsync()
 	{
-		var response = await REST.GetAsync<UserPageResponse>(App.User!.Name);
+		var response = await REST.GetAsync<UserPageRacesResponse>(Routes.UserRaces(this.User!.Name));
 
 		Races.Clear();
 
-		var recentlyCompleted = response?.RecentlyCompletedTracks?.Data;
+		var recentlyCompleted = response?.Data;
 		if (recentlyCompleted is null)
 			return;
 
@@ -596,7 +634,7 @@ public sealed partial class RacesPage : Page, IRefreshableView, ISearchableView
 			recentlyCompleted.Select(async track =>
 			{
 				var response = await REST.GetAsync<APIResponse<RaceEntryData[]>>(
-					Endpoints.RaceData(track.ID, App.User!.ID)
+					Routes.RaceData((ulong)track.ID!, this.User!.ID)
 				);
 
 				var race = response?.Data?.FirstOrDefault();
@@ -613,15 +651,12 @@ public sealed partial class RacesPage : Page, IRefreshableView, ISearchableView
 		foreach (var data in races)
 			Races.Add(new Race(data));
 
-		this.RaceCount.Text = $"{Races.Count} races";
+		_ = UpdateRaceCount((uint)Races.Count);
 	}
 
-	private async void RefreshContainer_RefreshRequested(
-		RefreshContainer sender,
-		RefreshRequestedEventArgs args)
+	private async void RefreshContainer_RefreshRequested(RefreshContainer sender, RefreshRequestedEventArgs args)
 	{
 		using var deferral = args.GetDeferral();
-
 		try
 		{
 			await RefreshRacesAsync();

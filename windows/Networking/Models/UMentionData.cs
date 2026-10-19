@@ -15,4 +15,7 @@ public sealed class UMentionData
 
 	[JsonPropertyName("image")]
 	public string AvatarURL { get; init; } = "";
+
+	public override string ToString()
+		=> DisplayName;
 }

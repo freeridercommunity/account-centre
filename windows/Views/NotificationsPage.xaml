@@ -1,0 +1,147 @@
+<Page x:Class="AccountCentre.Views.NotificationsPage"
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:models="using:AccountCentre.Models"
+	xmlns:converters="using:AccountCentre.Converters">
+	<Page.Resources>
+		<converters:TimeAgoConverter x:Key="TimeAgoConverter"/>
+	</Page.Resources>
+
+	<Grid>
+		<Grid.RowDefinitions>
+			<RowDefinition Height="Auto"/>
+			<RowDefinition Height="*"/>
+		</Grid.RowDefinitions>
+
+		<Grid Padding="32,32,32,12">
+			<Grid.ColumnDefinitions>
+				<ColumnDefinition Width="*"/>
+				<ColumnDefinition Width="Auto"/>
+			</Grid.ColumnDefinitions>
+
+			<StackPanel Spacing="4">
+				<TextBlock Text="Notifications" Style="{StaticResource TitleTextBlockStyle}"/>
+				<TextBlock x:Name="NotificationCount"
+					Text="0 notifications"
+					Opacity="0.7"/>
+			</StackPanel>
+
+			<StackPanel Orientation="Horizontal"
+				Grid.Column="1"
+				Spacing="8"
+				VerticalAlignment="Top">
+				<Button Style="{StaticResource SubtleButtonStyle}"
+					Click="OpenSettingsDialog_Click">
+					<StackPanel Orientation="Horizontal" Spacing="8">
+						<FontIcon Glyph="&#xE713;"/>
+						<TextBlock Text="Settings"/>
+					</StackPanel>
+				</Button>
+			</StackPanel>
+		</Grid>
+
+		<RefreshContainer Grid.Row="1" x:Name="RefreshContainer"
+			RefreshRequested="RefreshContainer_RefreshRequested">
+			<ListView x:Name="NotificationView"
+				ItemsSource="{x:Bind Notifications, Mode=OneWay}"
+				IsItemClickEnabled="False"
+				Padding="32,16"
+				SelectionMode="None">
+				<ListView.Resources>
+					<MenuFlyout x:Key="NotificationMenu">
+						<MenuFlyoutItem Text="Stop seeing notifications like this" Click="DisableNotificationType_Click">
+							<MenuFlyoutItem.Icon>
+								<FontIcon Glyph="&#xE733;"/>
+							</MenuFlyoutItem.Icon>
+						</MenuFlyoutItem>
+					</MenuFlyout>
+				</ListView.Resources>
+				<ListView.ItemContainerStyle>
+					<Style TargetType="ListViewItem" BasedOn="{StaticResource DefaultListViewItemStyle}">
+						<Setter Property="Background" Value="#06000000"/>
+						<Setter Property="ContextFlyout" Value="{StaticResource NotificationMenu}"/>
+						<Setter Property="Padding" Value="12"/>
+					</Style>
+				</ListView.ItemContainerStyle>
+				<ListView.ItemTemplate>
+					<DataTemplate x:DataType="models:Notification">
+							<Grid>
+								<Grid.ColumnDefinitions>
+									<ColumnDefinition Width="Auto"/>
+									<ColumnDefinition Width="*"/>
+									<ColumnDefinition Width="Auto"/>
+								</Grid.ColumnDefinitions>
+
+								<Grid Margin="0,0,16,0" VerticalAlignment="Top">
+									<FontIcon Glyph="&#xE713;" Visibility="{x:Bind IsSystem, Mode=OneTime}"/>
+									<PersonPicture ProfilePicture="{Binding User.DisplayAvatarURL, FallbackValue='ms-appx:///Assets/default-avatar.png', TargetNullValue='ms-appx:///Assets/default-avatar.png'}"
+										CornerRadius="20"
+										Height="40"
+										VerticalAlignment="Center"
+										Width="40"
+										ToolTipService.ToolTip="{Binding User.DisplayName}"
+										Visibility="{x:Bind IsSenderUser, Mode=OneTime}">
+										<PersonPicture.ContextFlyout>
+											<MenuFlyout x:Name="UserMenu">
+												<MenuFlyoutItem Text="View profile" Click="ViewProfile_Click">
+													<MenuFlyoutItem.Icon>
+														<FontIcon Glyph="&#xE8A7;"/>
+													</MenuFlyoutItem.Icon>
+												</MenuFlyoutItem>
+
+												<MenuFlyoutSeparator/>
+
+												<MenuFlyoutItem Text="Remove friend"
+													Foreground="{ThemeResource SystemFillColorCriticalBrush}"
+													Click="RemoveFriend_Click"
+													IsEnabled="False">
+													<MenuFlyoutItem.Icon>
+														<FontIcon Glyph="&#xF69B;"/>
+													</MenuFlyoutItem.Icon>
+												</MenuFlyoutItem>
+											</MenuFlyout>
+										</PersonPicture.ContextFlyout>
+									</PersonPicture>
+								</Grid>
+
+								<StackPanel
+									Grid.Column="1"
+									Spacing="3"
+									VerticalAlignment="Center">
+									<TextBlock TextWrapping="Wrap"
+										FontSize="15"
+										Loaded="NotificationText_Loaded"/>
+
+									<Border BorderBrush="{ThemeResource TextFillColorSecondaryBrush}"
+										BorderThickness="3,0,0,0"
+										Padding="12,4,0,4"
+										Opacity="0.8"
+										Visibility="{x:Bind HasQuote}">
+										<RichTextBlock FontSize="14" TextWrapping="Wrap">
+											<Paragraph>
+												<!-- <InlineUIContainer>
+													<FontIcon Glyph="&#xE9B2;" FontSize="14"/>
+												</InlineUIContainer> -->
+												<Run Text="{Binding Message}"/>
+											</Paragraph>
+										</RichTextBlock>
+									</Border>
+
+									<TextBlock Text="{Binding Timestamp, Converter={StaticResource TimeAgoConverter}}"
+										FontSize="12"
+										Opacity="0.6"/>
+								</StackPanel>
+
+								<StackPanel Grid.Column="2"
+									Orientation="Horizontal"
+									Margin="8,0,0,0"
+									Spacing="12"
+									VerticalAlignment="Center"
+									Loaded="NotificationActionRow_Loaded"/>
+							</Grid>
+					</DataTemplate>
+				</ListView.ItemTemplate>
+			</ListView>
+		</RefreshContainer>
+	</Grid>
+</Page>

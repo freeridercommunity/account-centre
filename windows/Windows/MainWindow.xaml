@@ -42,26 +42,30 @@
 					SuggestionChosen="TitleBar_SearchSuggestionChosen"/>
 			</TitleBar.Content>
 			<TitleBar.RightHeader>
-				<Button
-					Background="Transparent"
+				<Button x:Name="ProfileButton"
+					Style="{StaticResource SubtleButtonStyle}"
 					BorderThickness="0"
 					CornerRadius="16"
-					Width="32"
-					Height="32"
-					Padding="0"
-					HorizontalContentAlignment="Center"
-					VerticalContentAlignment="Center">
+					Width="30"
+					Height="30"
+					Padding="0">
 
 					<PersonPicture x:Name="PersonPicture"
-						Width="32"
-						Height="32" />
+						Width="30"
+						Height="30">
+						<PersonPicture.RenderTransform>
+							<CompositeTransform
+								x:Name="PersonPictureTransform"
+								CenterX="15"
+								CenterY="15"/>
+						</PersonPicture.RenderTransform>
+					</PersonPicture>
 
 					<Button.Flyout>
-						<MenuFlyout Placement="BottomEdgeAlignedRight" Opened="AccountFlyout_Opened">
-							<local:AccountFlyoutItem x:Name="AccountHeader">
+						<MenuFlyout Placement="BottomEdgeAlignedRight">
+							<local:AccountFlyoutItem x:Name="AccountHeader" User="{x:Bind Session.User}">
 								<MenuFlyoutItem.Template>
 									<ControlTemplate TargetType="MenuFlyoutItem">
-
 										<StackPanel
 											Orientation="Horizontal"
 											Padding="12"
@@ -69,10 +73,9 @@
 											<PersonPicture
 													x:Name="FlyoutPersonPicture"
 													Width="48"
-													Height="48" />
+													Height="48"/>
 
 											<StackPanel Spacing="2" VerticalAlignment="Center">
-
 													<TextBlock
 														x:Name="FlyoutName"
 														FontSize="16"
@@ -84,10 +87,8 @@
 														FontSize="11"
 														Opacity="0.6"
 														IsTextSelectionEnabled="True"/>
-
 												</StackPanel>
 										</StackPanel>
-
 									</ControlTemplate>
 								</MenuFlyoutItem.Template>
 							</local:AccountFlyoutItem>
@@ -106,7 +107,17 @@
 								</MenuFlyoutItem.Icon>
 							</MenuFlyoutItem>
 
-							<MenuFlyoutSeparator />
+							<MenuFlyoutSeparator/>
+
+							<SplitMenuFlyoutItem x:Name="SwitchAccounts"
+								Text="Switch accounts"
+								Click="SwitchAccounts_Click">
+								<SplitMenuFlyoutItem.Icon>
+									<FontIcon Glyph="&#xE8AB;"/>
+								</SplitMenuFlyoutItem.Icon>
+							</SplitMenuFlyoutItem>
+
+							<MenuFlyoutSeparator/>
 
 							<MenuFlyoutItem Text="Sign out"
 								Foreground="{ThemeResource SystemFillColorCriticalBrush}"
@@ -116,9 +127,17 @@
 								</MenuFlyoutItem.Icon>
 							</MenuFlyoutItem>
 
+							<MenuFlyoutSeparator Visibility="{x:Bind IsDeveloperModeEnabled}"/>
+
+							<MenuFlyoutItem Text="Copy User ID"
+								Visibility="{x:Bind IsDeveloperModeEnabled}"
+								Click="CopyUserID_Click">
+								<MenuFlyoutItem.Icon>
+									<FontIcon Glyph="&#xE8C8;"/>
+								</MenuFlyoutItem.Icon>
+							</MenuFlyoutItem>
 						</MenuFlyout>
 					</Button.Flyout>
-
 				</Button>
 			</TitleBar.RightHeader>
 		</TitleBar>
@@ -134,12 +153,19 @@
 			CompactPaneLength="48"
 			OpenPaneLength="260">
 			<NavigationView.MenuItems>
-
 				<NavigationViewItem
 					Content="Home"
 					Icon="Home"
 					IsSelected="True"
-					Tag="Home" />
+					Tag="Home"/>
+
+				<NavigationViewItem
+					Content="Comments"
+					IsEnabled="False">
+					<NavigationViewItem.Icon>
+						<FontIcon Glyph="&#xE8F2;"/>
+					</NavigationViewItem.Icon>
+				</NavigationViewItem>
 
 				<NavigationViewItem
 					Content="Created"
@@ -153,38 +179,43 @@
 					Content="Friends"
 					Tag="Friends">
 					<NavigationViewItem.Icon>
-						<FontIcon Glyph="&#xE902;" />
+						<FontIcon Glyph="&#xE902;"/>
 					</NavigationViewItem.Icon>
+				</NavigationViewItem>
+
+				<NavigationViewItem
+					Content="Notifications"
+					Tag="Notifications">
+					<NavigationViewItem.Icon>
+						<FontIcon Glyph="&#xEA8F;"/>
+					</NavigationViewItem.Icon>
+					<NavigationViewItem.InfoBadge>
+						<InfoBadge x:Name="NotificationInfoBadge" Visibility="Collapsed"/>
+					</NavigationViewItem.InfoBadge>
 				</NavigationViewItem>
 
 				<NavigationViewItem
 					Content="Races"
 					Tag="Races">
 					<NavigationViewItem.Icon>
-						<FontIcon Glyph="&#xE7C1;" />
+						<FontIcon Glyph="&#xE7C1;"/>
 					</NavigationViewItem.Icon>
 				</NavigationViewItem>
-
 			</NavigationView.MenuItems>
 			<NavigationView.FooterMenuItems>
-
 				<NavigationViewItem
 					Content="Sponsor"
 					Tag="https://github.com/sponsors/Calculamatrise"
 					SelectsOnInvoked="False">
 					<NavigationViewItem.Icon>
-						<FontIcon
-							FontFamily="Segoe Fluent Icons"
-							Glyph="&#xEB51;"
-							Foreground="#C96198" />
+						<FontIcon Glyph="&#xEB51;" Foreground="#C96198"/>
 					</NavigationViewItem.Icon>
 				</NavigationViewItem>
-
 			</NavigationView.FooterMenuItems>
 			<NavigationView.Content>
-
-				<Frame x:Name="ContentFrame"/>
-
+				<Frame x:Name="ContentFrame"
+					Navigating="ContentFrame_Navigating"
+					Navigated="ContentFrame_Navigated"/>
 			</NavigationView.Content>
 		</NavigationView>
 	</Grid>

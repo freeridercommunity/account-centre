@@ -1,6 +1,6 @@
 using Microsoft.UI.Xaml.Controls;
 
-namespace AccountCentre.Components;
+namespace AccountCentre.Components.Dialogs;
 
 public sealed partial class ConfirmDialog : ContentDialog
 {

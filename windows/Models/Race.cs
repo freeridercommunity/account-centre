@@ -1,9 +1,11 @@
 using Microsoft.UI.Xaml;
 using System.Globalization;
+using System.Text.Json;
 
 namespace AccountCentre.Models;
 
 using Core;
+using Core.Storage;
 using Networking;
 using Networking.Models;
 using Networking.Responses;
@@ -29,7 +31,8 @@ public sealed record Race : Base
 			return Utils.FormatTimeAgo(timestamp);
 		}
 	}
-	public bool IsFeatured { get; set; }
+	public bool IsFeatured { get; internal set; } = false;
+	public bool IsFeaturedLoaded { get; private set; }
 	public Race(RaceEntryData data) : base(data!.User!.ID)
 	{
 		if (data.Track != null)
@@ -55,13 +58,70 @@ public sealed record Race : Base
 		}
 	}
 
-	public async Task<UserTrackStats> FetchStats()
+	public async Task<bool> FetchFeatured()
+	{
+		if (IsFeaturedLoaded)
+			return IsFeatured;
+
+		var endpoint = "https://raw.githubusercontent.com/freeridercommunity/featured-ghosts/master/data.json";
+		try
+		{
+			if (CacheStore.Default.Get(endpoint) is not byte[] data)
+			{
+				using HttpClient Client = new()
+				{
+					DefaultRequestHeaders =
+					{
+						{ "User-Agent", "FreeRiderCommunityAccountCentre" }
+					}
+				};
+
+				var response = await Client.GetAsync(endpoint);
+				if (!response.IsSuccessStatusCode)
+					throw new Exception(response.ReasonPhrase ?? "Failed to fetch");
+
+				data = await response.Content.ReadAsByteArrayAsync();
+				CacheStore.Default.Set(endpoint, data);
+			}
+
+			JsonDocument document = JsonDocument.Parse(data);
+
+			if (document.RootElement.TryGetProperty(this.User!.DisplayName, out JsonElement races))
+			{
+				var url = $"frhd.co/t/{Track!.ID}/r/";
+				if (races.TryGetProperty($"{url}{this.User!.Name}", out JsonElement featureType))
+				{
+					IsFeatured = true;
+				}
+				else
+				{
+					foreach (JsonProperty property in races.EnumerateObject())
+					{
+						if (property.Name.StartsWith(url, StringComparison.OrdinalIgnoreCase))
+						{
+							// string featureType = property.Value.GetString() ?? "";
+
+							IsFeatured = true;
+						}
+					}
+				}
+			}
+
+			IsFeaturedLoaded = true;
+		}
+		catch
+		{
+		}
+
+		return IsFeatured;
+	}
+
+	public async Task<UserTrackStats> FetchStats(REST.Session rest)
 	{
 		if (Track == null)
 			throw new Exception("Track is not defined");
 
-		var response = await REST.GetAsync<TrackRaceResponse>(Networking.Endpoints.TrackRace(Track.ID, App.User!.Name)) ?? throw new Exception("Response body is empty");
-
+		var response = await rest.GetAsync<TrackRaceResponse>(Routes.TrackRace(Track.ID, this.User!.Name)) ?? throw new Exception("Response body is empty");
 		if (response.UserTrackStats is not UserTrackStats stats)
 			throw new Exception("Response body is empty");
 
@@ -79,10 +139,8 @@ public sealed record Race : Base
 		return stats;
 	}
 
-	public async Task Delete()
-	{
-		await RESTExtended.DeleteAsync(Networking.ExtendedAPI.Endpoints.Race(ID));
-	}
+	public async Task Delete(RESTExtended.Session rest)
+		=> await rest.DeleteAsync(RESTExtended.Routes.Race(ID));
 
 	private static string TicksToTime(uint ticks)
 	{

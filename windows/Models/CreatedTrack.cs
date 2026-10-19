@@ -44,8 +44,6 @@ public sealed record CreatedTrack : Track
 		IsPartial = false;
 	}
 
-	public async Task Delete()
-	{
-		await RESTExtended.DeleteAsync(Endpoints.Track(ID));
-	}
+	public async Task Delete(RESTExtended.Session rest)
+		=> await rest.DeleteAsync(RESTExtended.Routes.Track(ID));
 }

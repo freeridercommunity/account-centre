@@ -5,11 +5,7 @@ namespace AccountCentre.Converters;
 
 public sealed class FriendActivityToStatusStyleConverter : IValueConverter
 {
-	public object Convert(
-		object value,
-		Type targetType,
-		object parameter,
-		string language)
+	public object Convert(object value, Type targetType, object parameter, string language)
 	{
 		if (value is not long activityTimestamp)
 			return Application.Current.Resources["InformationalDotInfoBadgeStyle"];
@@ -28,12 +24,6 @@ public sealed class FriendActivityToStatusStyleConverter : IValueConverter
 		return Application.Current.Resources[key];
 	}
 
-	public object ConvertBack(
-		object value,
-		Type targetType,
-		object parameter,
-		string language)
-	{
-		throw new NotSupportedException();
-	}
+	public object ConvertBack(object value, Type targetType, object parameter, string language)
+		=> throw new NotSupportedException();
 }

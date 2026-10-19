@@ -6,10 +6,11 @@ using System.Text.Json.Serialization;
 
 namespace AccountCentre.Core;
 
+using Settings;
+
 public static class UpdateManager
 {
-	public static Version CurrentVersion =>
-		typeof(App).Assembly.GetName().Version ?? new Version();
+	public static Version CurrentVersion => typeof(App).Assembly.GetName().Version ?? new Version();
 	public static string? InstallerPath { get; private set; }
 	public static DateTimeOffset? LastChecked;
 	public static string LastCheckedText =>
@@ -28,12 +29,8 @@ public static class UpdateManager
 		}
 	};
 	private static string InstallerDirectory =>
-		Path.Combine(
-			AppData.TempDirectory,
-			"Installers"
-		);
+		Path.Combine(AppData.TempDirectory, "Installers");
 	private static GitHubRelease? LatestRelease;
-
 	public static async Task<GitHubRelease?> CheckAsync(bool force = false)
 	{
 		if (LatestRelease != null && force != true)
@@ -49,32 +46,32 @@ public static class UpdateManager
 		if (!isNewer)
 			return null;
 
+		if (SettingsManager.Current.AutoDownloadUpdates)
+		{
+			var installer = GetInstaller(release);
+			if (installer != null)
+				_ = DownloadAssetAsync(installer);
+		}
+
 		LatestRelease = release;
 		return LatestRelease;
 	}
 
 	public static GitHubReleaseAsset? GetInstaller(GitHubRelease release)
-	{
-		return release.Assets.FirstOrDefault(
+		=> release.Assets.FirstOrDefault(
 			asset => asset.Name.Equals(
 				Installer,
 				StringComparison.OrdinalIgnoreCase
 			)
 		);
-	}
 
 	public static async Task<string?> GetCachedInstallerAsync(GitHubReleaseAsset installer)
 	{
-		var path = Path.Combine(
-			InstallerDirectory,
-			installer.Name
-		);
-
+		var path = Path.Combine(InstallerDirectory, installer.Name);
 		if (!File.Exists(path))
 			return null;
 
 		var info = FileVersionInfo.GetVersionInfo(path);
-
 		if (!Version.TryParse(info.ProductVersion, out var productVersion) ||
 			!IsNewer(productVersion.ToString()))
 			return null;
@@ -107,10 +104,7 @@ public static class UpdateManager
 				FileOptions.Asynchronous
 			);
 
-			using var response = await Client.GetAsync(
-				asset.DownloadUrl,
-				HttpCompletionOption.ResponseHeadersRead
-			);
+			using var response = await Client.GetAsync(asset.DownloadUrl, HttpCompletionOption.ResponseHeadersRead);
 
 			response.EnsureSuccessStatusCode();
 
@@ -158,34 +152,28 @@ public static class UpdateManager
 	}
 
 	public static bool DownloadStarted(GitHubReleaseAsset asset)
-	{
-		return File.Exists(
+		=> File.Exists(
 			Path.Combine(
 				InstallerDirectory,
 				asset.Name + ".tmp"
 			)
 		);
-	}
 
 	public static bool IsDownloaded(GitHubReleaseAsset asset)
-	{
-		return File.Exists(
+		=> File.Exists(
 			Path.Combine(
 				InstallerDirectory,
 				asset.Name
 			)
 		);
-	}
 
 	public static bool InstallerDownloadStarted()
-	{
-		return File.Exists(
+		=> File.Exists(
 			Path.Combine(
 				InstallerDirectory,
 				Installer + ".tmp"
 			)
 		);
-	}
 
 	public static bool IsInstallerDownloaded()
 	{

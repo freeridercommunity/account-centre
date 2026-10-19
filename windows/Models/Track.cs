@@ -4,20 +4,24 @@ using System.Text.Json.Serialization;
 namespace AccountCentre.Models;
 
 using Core;
+using Core.Storage;
 using Networking;
 using Networking.Models;
 using Networking.Responses;
 
 public record Track : Base
 {
+	internal static readonly CacheStore ThumbnailCache = new(Path.Combine(AppData.CacheDirectory, "Thumbnails"))
+	{
+		// SerializeKeys = false
+	};
 	public string Title { get; internal set; } = "";
 	public string Description { get; internal set; } = "";
 	public string? Code { get; internal set; }
 	public bool IsFeatured { get; internal set; }
 	public bool IsHidden { get; internal set; }
 	public long? PublishTimestamp { get; internal set; }
-	public bool PublishedTimestampLoaded =>
-		PublishTimestamp > 0;
+	public bool PublishedTimestampLoaded => PublishTimestamp > 0;
 	public string PublishedTimeAgo
 	{
 		get
@@ -30,8 +34,8 @@ public record Track : Base
 	}
 	public virtual string? ThumbnailURL { get; set; }
 	public string? DisplayThumbnailURL => (ThumbnailURL != null &&
-		CacheManager.Has(ThumbnailURL))
-		? CacheManager.GetPath(ThumbnailURL)
+		ThumbnailCache.Has(ID.ToString()))
+		? ThumbnailCache.GetPath(ID.ToString())
 		: ThumbnailURL;
 	// Test cache
 	// public string? DisplayThumbnailURL {
@@ -40,19 +44,17 @@ public record Track : Base
 	// 		if (ThumbnailURL is null)
 	// 			return null;
 
-	// 		if (!CacheManager.Has(ThumbnailURL))
+	// 		if (!ThumbnailCache.Has(ThumbnailURL))
 	// 		{
 	// 			_ = CacheThumbnailAsync();
 	// 			return null;
 	// 		}
 
-	// 		return CacheManager.GetPath(ThumbnailURL);
+	// 		return ThumbnailCache.GetPath(ThumbnailURL);
 	// 	}
 	// }
-	public Track(TrackData data) : base(data!.ID)
-	{
-		Patch(data);
-	}
+	public Track(TrackData data) : base((ulong)data.ID!)
+		=> Patch(data);
 
 	public void Patch(TrackData data)
 	{
@@ -139,13 +141,11 @@ public record Track : Base
 		if (TrackData.ResolveJsonPropertyName(field) is not string prop)
 			return null;
 
-		var response = await REST.GetAsync<TrackAPIResponse>(Endpoints.TrackData(ID, prop));
-
+		var response = await REST.GetAsync<TrackAPIResponse>(Routes.TrackData(ID, prop));
 		if (response?.Data?.Track is not TrackData trackData)
 			return null;
 
 		var value = trackData[field];
-
 		if (value is not null)
 			this[field] = value;
 
@@ -156,20 +156,18 @@ public record Track : Base
 	public async Task CacheThumbnailAsync()
 	{
 		if (string.IsNullOrEmpty(ThumbnailURL) ||
-			CacheManager.Has(ThumbnailURL))
+			ThumbnailCache.Has(ID.ToString()))
 			return;
 
 		await ThumbnailSemaphore.WaitAsync();
 
 		try
 		{
-			if (CacheManager.Has(ThumbnailURL))
+			if (ThumbnailCache.Has(ID.ToString()))
 				return;
 
 			await using var stream = await REST.GetStreamAsync(ThumbnailURL);
-			await CacheManager.SetAsync(
-				ThumbnailURL,
-				stream);
+			await ThumbnailCache.SetAsync(ID.ToString(), stream);
 
 			OnPropertyChanged(nameof(DisplayThumbnailURL));
 		}

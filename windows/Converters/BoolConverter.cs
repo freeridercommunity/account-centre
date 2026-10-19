@@ -5,12 +5,8 @@ namespace AccountCentre.Converters;
 
 public sealed class BoolConverter : JsonConverter<bool>
 {
-	public override bool Read(
-		ref Utf8JsonReader reader,
-		Type typeToConvert,
-		JsonSerializerOptions options)
-	{
-		return reader.TokenType switch
+	public override bool Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+		=> reader.TokenType switch
 		{
 			JsonTokenType.True => true,
 			JsonTokenType.False => false,
@@ -28,13 +24,7 @@ public sealed class BoolConverter : JsonConverter<bool>
 				$"Cannot convert {reader.TokenType} to bool."
 			)
 		};
-	}
 
-	public override void Write(
-		Utf8JsonWriter writer,
-		bool value,
-		JsonSerializerOptions options)
-	{
-		writer.WriteBooleanValue(value);
-	}
+	public override void Write(Utf8JsonWriter writer, bool value, JsonSerializerOptions options)
+		=> writer.WriteBooleanValue(value);
 }

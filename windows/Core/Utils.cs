@@ -20,7 +20,6 @@ public static class Utils
 	{
 		var published = DateTimeOffset.FromUnixTimeSeconds(timestamp);
 		var elapsed = DateTimeOffset.UtcNow - published;
-
 		if (elapsed.TotalSeconds < 60)
 			return "just now";
 

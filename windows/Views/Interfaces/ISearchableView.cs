@@ -1,4 +1,4 @@
-namespace AccountCentre.Views;
+namespace AccountCentre.Views.Interfaces;
 
 public interface ISearchableView
 {

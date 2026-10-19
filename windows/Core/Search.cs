@@ -29,7 +29,6 @@ public static class Search
 	public static async Task<UMentionData[]> User(string query)
 	{
 		var response = await REST.PostAsync<UMentionLookupAPIResponse>($"search/u_mention_lookup/{query}");
-
 		if (response?.Data == null)
 			throw new Exception("Response returned no data");
 

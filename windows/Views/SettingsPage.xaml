@@ -2,65 +2,136 @@
 	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
 	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
 	xmlns:controls="using:CommunityToolkit.WinUI.Controls">
-	<Grid
-		MaxWidth="1130"
-		RowSpacing="12">
+	<Grid MaxWidth="1130" RowSpacing="12">
 		<Grid.RowDefinitions>
 			<RowDefinition Height="Auto"/>
 			<RowDefinition Height="*"/>
 		</Grid.RowDefinitions>
 
-		<TextBlock Text="Settings"
-			Padding="32,32,32,0"
-			Style="{StaticResource TitleTextBlockStyle}"/>
-
-		<ScrollViewer
-			Grid.Row="1"
-			Padding="32,0,32,32">
+		<TextBlock Style="{StaticResource TitleTextBlockStyle}" Text="Settings" Padding="32,32,32,0"/>
+		<ScrollView Grid.Row="1" Padding="32,0,32,32">
 			<StackPanel Spacing="4">
 				<StackPanel Orientation="Horizontal" Spacing="12" Margin="0,0,0,16">
-					<PersonPicture ProfilePicture="{x:Bind CurrentUser.AvatarURL}"
+					<Grid Background="Transparent"
 						Height="48"
-						Width="48"/>
+						Width="48"
+						PointerEntered="EditRow_Entered"
+						PointerExited="EditRow_Exited">
+						<PersonPicture ProfilePicture="{x:Bind Session.User.DisplayAvatarURL, Mode=OneWay}"
+							Height="48"
+							Margin="0"
+							Width="48"/>
+						<Button CornerRadius="24"
+							HorizontalAlignment="Stretch"
+							Opacity="0"
+							Padding="14"
+							VerticalAlignment="Stretch"
+							Click="ChangeAvatar_Click">
+							<Button.Resources>
+								<SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="#80000000"/>
+								<SolidColorBrush x:Key="ButtonBackgroundPressed" Color="#a0000000"/>
+							</Button.Resources>
+							<Viewbox Stretch="Uniform">
+								<FontIcon Glyph="&#xE70F;"/>
+							</Viewbox>
+						</Button>
+					</Grid>
 					<StackPanel VerticalAlignment="Center">
-						<TextBlock Text="{x:Bind CurrentUser.DisplayName}"
-							FontSize="24"/>
-						<TextBlock Text="{x:Bind CurrentUser.Email}"
-							Foreground="DarkGray"/>
+						<Grid Background="Transparent"
+							ColumnSpacing="8"
+							PointerEntered="EditRow_Entered"
+							PointerExited="EditRow_Exited">
+							<Grid.ColumnDefinitions>
+								<ColumnDefinition Width="Auto"/>
+								<ColumnDefinition Width="Auto"/>
+							</Grid.ColumnDefinitions>
+							<TextBlock Text="{x:Bind Session.User.DisplayName}" FontSize="24"/>
+							<Button Grid.Column="1" x:Name="NameChangeButton"
+								Style="{StaticResource SubtleButtonStyle}"
+								Opacity="0"
+								Padding="8,0"
+								VerticalAlignment="Center"
+								IsEnabled="False"
+								Click="ChangeUsername_Click">
+								<StackPanel Orientation="Horizontal" Spacing="8">
+									<Viewbox Stretch="Uniform">
+										<FontIcon Glyph="&#xE70F;" FontSize="14"/>
+									</Viewbox>
+									<TextBlock FontSize="14">
+										<Run x:Name="NameChangesRemaining">0</Run> Remaining
+									</TextBlock>
+								</StackPanel>
+							</Button>
+						</Grid>
+
+						<Grid Background="Transparent"
+							ColumnSpacing="8"
+							PointerEntered="EditRow_Entered"
+							PointerExited="EditRow_Exited">
+							<Grid.ColumnDefinitions>
+								<ColumnDefinition Width="Auto"/>
+								<ColumnDefinition Width="Auto"/>
+							</Grid.ColumnDefinitions>
+							<TextBlock Text="{x:Bind Session.User.Email}" Foreground="DarkGray"/>
+							<Button Grid.Column="1"
+								Style="{StaticResource SubtleButtonStyle}"
+								Opacity="0"
+								Padding="8,0"
+								VerticalAlignment="Stretch"
+								Click="ChangeEmail_Click">
+								<Viewbox Stretch="Uniform">
+									<FontIcon Glyph="&#xE70F;" FontSize="14"/>
+								</Viewbox>
+							</Button>
+						</Grid>
 					</StackPanel>
 				</StackPanel>
 
-				<TextBlock Style="{StaticResource SubtitleTextBlockStyle}" Text="Account"/>
-
-				<controls:SettingsCard Header="Change username"
-					Description="Change the username associated with your account">
+				<TextBlock Text="Account" Style="{StaticResource SubtitleTextBlockStyle}"/>
+				<controls:SettingsCard Header="Change password"
+					Description="Change the password used to sign in">
 					<Button Style="{StaticResource AccentButtonStyle}"
-						Content="Change username"
-						Click="ChangeUsername_Click"/>
-				</controls:SettingsCard>
-
-				<controls:SettingsCard
-					Description="Change the email associated with your account"
-					Header="Change email">
-					<Button Style="{StaticResource AccentButtonStyle}"
-						Content="Change email"
-						Click="ChangeEmail_Click"/>
-				</controls:SettingsCard>
-
-				<controls:SettingsCard
-					Description="Change the password used to sign in"
-					Header="Change password">
-					<Button Style="{StaticResource AccentButtonStyle}"
-						Content="Change password" IsEnabled="False"
+						Content="Change password"
 						Click="ChangePassword_Click"/>
 				</controls:SettingsCard>
 
-				<TextBlock Style="{StaticResource SubtitleTextBlockStyle}" Text="General"/>
+				<controls:SettingsCard Header="Update forum password"
+					Description="Change the password used to sign into forums">
+					<Button Style="{StaticResource AccentButtonStyle}"
+						Content="Update forum password"
+						Click="UpdateForumPassword_Click"/>
+				</controls:SettingsCard>
+
+				<controls:SettingsCard Header="Sign out everywhere"
+					Description="Sign out of your account on all devices with active sessions">
+					<Button Style="{StaticResource AccentButtonStyle}"
+						Content="Sign out"
+						Click="ClearSessions_Click"/>
+				</controls:SettingsCard>
+
+				<TextBlock Text="General" Style="{StaticResource SubtitleTextBlockStyle}"/>
+				<controls:SettingsCard Header="Allow multiple sessions"
+					Description="Choose whether to allow running concurrent app instances">
+					<ToggleSwitch IsOn="{x:Bind Settings.AllowConcurrentSessions, Mode=TwoWay}"/>
+				</controls:SettingsCard>
 
 				<controls:SettingsCard Header="Minimize to tray"
 					Description="Minimize to system tray when the application is closed"
 					IsEnabled="False">
-					<ToggleSwitch/>
+					<ToggleSwitch IsOn="{x:Bind Settings.MinimizeToTray, Mode=TwoWay}"/>
+				</controls:SettingsCard>
+
+				<controls:SettingsCard Header="Remember users"
+					Description="Save user login information">
+					<ToggleSwitch IsOn="{x:Bind Settings.SaveLoginInfo, Mode=TwoWay}" IsEnabled="False"/>
+				</controls:SettingsCard>
+
+				<controls:SettingsCard Header="Startup account behaviour"
+					Description="Choose whether to automatically sign in to your last used account or select an account on startup">
+					<ComboBox SelectedIndex="{x:Bind StartupAccountBehaviorIndex, Mode=TwoWay}">
+						<ComboBoxItem Content="Last used"/>
+						<ComboBoxItem Content="Always ask"/>
+					</ComboBox>
 				</controls:SettingsCard>
 
 				<controls:SettingsExpander Header="Advanced">
@@ -76,7 +147,7 @@
 						</controls:SettingsCard>
 
 						<controls:SettingsCard Header="Developer mode">
-							<ToggleSwitch IsOn="{x:Bind DeveloperMode}" Toggled="ToggleDeveloperMode_Toggle"/>
+							<ToggleSwitch IsOn="{x:Bind Settings.DeveloperMode, Mode=TwoWay}"/>
 						</controls:SettingsCard>
 
 						<controls:SettingsCard x:Name="ClearTempCard" Header="Remove temporary files">
@@ -127,43 +198,32 @@
 					<controls:SettingsExpander.Items>
 						<controls:SettingsCard Header="Update channel"
 							Description="Choose which versions you receive">
-
-							<ComboBox
-								ItemsSource="{x:Bind UpdateChannels}"
-								SelectedValue="{x:Bind UpdateChannel, Mode=TwoWay}"
-								SelectedValuePath="Value"
-								SelectionChanged="UpdateChannel_SelectionChanged">
-
-								<ComboBox.ItemTemplate>
-									<DataTemplate>
-										<TextBlock Text="{Binding Name}"/>
-									</DataTemplate>
-								</ComboBox.ItemTemplate>
+							<ComboBox SelectedIndex="{x:Bind UpdateChannelIndex, Mode=TwoWay}">
+								<ComboBoxItem Content="Stable"/>
+								<ComboBoxItem Content="Beta"/>
 							</ComboBox>
-
 						</controls:SettingsCard>
 						<controls:SettingsCard x:Name="CheckForUpdatesCard" Header="Update">
 							<Button x:Name="CheckForUpdatesButton" Style="{StaticResource AccentButtonStyle}"
 								Content="Check for updates" Click="CheckForUpdates_Click"/>
 						</controls:SettingsCard>
 						<controls:SettingsCard Header="Check for updates" Description="Automatically check for updates on startup">
-							<ToggleSwitch IsOn="{x:Bind CheckForUpdatesAtStartup}" Toggled="AutoScanUpdates_Toggle"/>
+							<ToggleSwitch IsOn="{x:Bind Settings.CheckForUpdatesAtStartup, Mode=TwoWay}"/>
 						</controls:SettingsCard>
 						<controls:SettingsCard Header="Download automatically" Description="Automatically download the latest update on startup">
-							<ToggleSwitch IsOn="{x:Bind AutoDownloadUpdates}" Toggled="AutoDownloadUpdates_Toggle"/>
+							<ToggleSwitch IsOn="{x:Bind Settings.AutoDownloadUpdates, Mode=TwoWay}"/>
 						</controls:SettingsCard>
 						<controls:SettingsCard>
 							<controls:SettingsCard.Header>
 								<StackPanel>
-									<HyperlinkButton Content="GitHub Repository" NavigateUri="https://github.com/freeridercommunity/account-control.win"/>
-									<HyperlinkButton Content="Latest Release" NavigateUri="https://github.com/freeridercommunity/account-control.win/releases/latest"/>
+									<HyperlinkButton Content="GitHub Repository" NavigateUri="https://github.com/freeridercommunity/account-centre"/>
+									<HyperlinkButton Content="Latest Release" NavigateUri="https://github.com/freeridercommunity/account-centre/releases/latest"/>
 								</StackPanel>
 							</controls:SettingsCard.Header>
 						</controls:SettingsCard>
 					</controls:SettingsExpander.Items>
 				</controls:SettingsExpander>
-
 			</StackPanel>
-		</ScrollViewer>
+		</ScrollView>
 	</Grid>
 </Page>

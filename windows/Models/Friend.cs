@@ -4,25 +4,19 @@ using Networking;
 using Networking.Models;
 using Networking.Responses;
 
-public sealed record Friend : Base
+public sealed record Friend : User
 {
-	public string Name { get; set; } = "";
-	public string DisplayName { get; set; } = "";
-	public string AvatarURL { get; set; } = "";
 	public string ActivityTimeAgo { get; set; } = "";
 	public long ActivityTimestamp { get; set; }
-	public Friend(FriendData data) : base(data.ID)
+	public Friend(FriendData data) : base(data)
 	{
-		Name = data.Name;
-		DisplayName = data.DisplayName;
-		AvatarURL = data.AvatarURL;
 		ActivityTimeAgo = data.ActivityTimeAgo;
 		ActivityTimestamp = data.ActivityTimestamp;
 	}
 
-	public async Task Remove()
+	public async Task Remove(REST.Session rest)
 	{
-		var response = await REST.PostAsync<APIResponse>(
+		var response = await rest.PostAsync<APIResponse>(
 			"friends/remove_friend",
 			new
 			{

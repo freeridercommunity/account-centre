@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<style>
+
+:root {
+	--dim: hsl(0 0 33%);
+}
+
+@media (prefers-color-scheme: dark) {
+	:root {
+		--dim: hsl(0 0 66%);
+		color-scheme: dark;
+	}
+}
+
+body {
+	font-family: 'Segoe UI','Helvetica Neue',Helvetica,Roboto,Oxygen,Ubuntu,Cantarell,'Fira Sans','Droid Sans',sans-serif;
+	/*margin: 0;*/
+}
+
+body > header:first-child {
+	justify-content: space-between;
+	line-height: 1;
+	margin: -8px;
+	margin-bottom: .5rem;
+	padding: 2rem;
+}
+
+body > main {
+	line-height: 1.5;
+	margin: .5em;
+}
+
+body > main, body > footer {
+	margin-inline: auto;
+	width: clamp(10rem, 90vw, 45rem);
+}
+
+[flex] { display: flex }
+[flex^="c"], [flex^="v"] { flex-direction: column }
+[flex][center="v"] { align-items: center }
+
+a { color: currentColor }
+a:hover { color: hsl(192 68% 35%) }
+a:not(:hover) { text-decoration: none }
+
+.dim { color: var(--dim) }
+
+	</style>
+</head>
+<body>
+	<header flex>
+		<span flex center="v" style="gap:1rem">
+			<span flex="column">
+				<h2>Privacy Policy</h2>
+				<div>Free Rider Community's <b><a href="https://github.com/freeridercommunity/account-centre">Account Centre</a></b></div>
+			</span>
+		</span>
+		<p><b class="dim">Effective date</b>: Oct 10, 2026</p>
+	</header>
+
+	<main>
+		<section id="introduction">
+			<b><a href="#introduction">Introduction</a></b>
+			<p><a href="https://github.com/freeridercommunity/account-centre">Account Centre</a> is a free, open-source desktop application developed by the <a href="https://github.com/freeridercommunity">Free Rider Community</a> to provide additional account management functionality for <a href="https://www.freeriderhd.com">Free Rider HD</a>.</p>
+			<p>We respect your privacy and do not collect, track, or remotely store your personal information.</p>
+		</section>
+
+		<section id="data-collection">
+			<b><a href="#data-collection">Data Collection and Sharing</a></b>
+			<p>We do not collect, sell, share, or store your personal data on our servers. We do not use analytics, advertising, or tracking services.</p>
+		</section>
+
+		<section id="local-data-storage">
+			<b><a href="#local-data-storage">Local Data Storage</a></b>
+			<p>We store only the information necessary for the application's functionality on your device, including:</p>
+			<ul>
+				<li>Non-sensitive account information</li>
+				<li>Application settings and preferences</li>
+				<li>An encrypted authentication session token</li>
+			</ul>
+			<p>All locally stored data remains on your device and is never uploaded to our servers.</p>
+		</section>
+
+		<section id="data-management">
+			<b><a href="#data-management">Data Management</a></b>
+			<p>You can access your account information through the application and remove locally stored data by signing out or clearing the application's data.</p>
+		</section>
+
+		<section id="network-communication">
+			<b><a href="#network-communication">Network Communication</a></b>
+			<p>We communicate directly with Free Rider HD only to authenticate your session, retrieve account information, or perform requested account operations.</p>
+			<p>Information transmitted to Free Rider HD is subject to <a href="https://www.kano.ca/privacy-policy">Kano Applications' Privacy Policy</a>. We do not route this information through our own servers or transmit it for unrelated purposes.</p>
+		</section>
+
+		<section id="disclaimer">
+			<b><a href="#disclaimer">Disclaimer</a></b>
+			<p>We are not affiliated with, endorsed by, or sponsored by Kano or Free Rider HD. Account Centre is an independent, unofficial application.</p>
+		</section>
+	</main>
+
+	<footer>
+		<b>Contact</b>
+		<p>For privacy-related questions or concerns, please open an issue in our GitHub repository:</p>
+		<address>
+			<a href="https://github.com/freeridercommunity/account-centre/issues">github://freeridercommunity/account-centre/issues</a>
+		</address>
+	</footer>
+</body>
+</html>

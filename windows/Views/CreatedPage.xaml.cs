@@ -2,6 +2,7 @@ using Microsoft.UI.Text;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Documents;
+using Microsoft.UI.Xaml.Navigation;
 using Microsoft.Windows.Storage.Pickers;
 using System.Collections.ObjectModel;
 using System.IO.Compression;
@@ -12,26 +13,76 @@ using Windows.System;
 
 namespace AccountCentre.Views;
 
-using Components;
+using Components.Dialogs;
 using Core;
+using Core.Sessions;
+using Core.Settings;
+using Interfaces;
 using Models;
 using Networking;
 using Networking.Models;
 using Networking.Responses;
 
-public sealed partial class CreatedPage : Page, IRefreshableView, ISearchableView
+public sealed partial class CreatedPage : Page, IRefreshableView, ISearchableView, ISessionAware
 {
+	public Session Session { get; set; } = null!;
 	public bool CanFilter => HasFeature || HasHidden;
 	public bool HasFeature =>
 		Tracks.Any(track => track.IsFeatured);
 	public bool HasHidden =>
 		Tracks.Any(track => track.IsHidden);
-	public ObservableCollection<CreatedTrack> Tracks { get; } = [];
+	public bool IsCurrentUser { get; private set; } = false;
+	public bool IsDeveloperModeEnabled => SettingsManager.Current.DeveloperMode;
+	private readonly Dictionary<ulong, ObservableCollection<CreatedTrack>> _trackCache = [];
+	public ObservableCollection<CreatedTrack> Tracks { get; private set; } = [];
+	private User? User;
 	public CreatedPage()
 	{
+		this.NavigationCacheMode = NavigationCacheMode.Enabled;
+
 		InitializeComponent();
 
 		_ = RefreshTracksAsync();
+	}
+
+	protected override void OnNavigatedTo(NavigationEventArgs e)
+	{
+		base.OnNavigatedTo(e);
+		if (e.Parameter is not ClientUser user)
+		{
+			this.User = null;
+			return;
+		}
+
+		this.User = user;
+		this.IsCurrentUser = user.ID == Session.User!.ID;
+		// Bindings.Update();
+
+		if (_trackCache.TryGetValue(user.ID, out var cached))
+			Tracks = cached;
+		else
+		{
+			Tracks = [];
+			Bindings.Update();
+
+			_trackCache[user.ID] = Tracks;
+
+			_ = RefreshTracksAsync();
+		}
+
+		_ = UpdateTrackCount((uint)Tracks.Count);
+	}
+
+	private async Task UpdateTrackCount(uint count = 0)
+	{
+		if (this.User == null)
+			return;
+
+		var userStats = await User.FetchStats();
+		if (userStats == null)
+			return;
+
+		this.TrackCount.Text = $"{count} of {userStats.Created} tracks";
 	}
 
 	private TaskCompletionSource? _refreshCompletion;
@@ -48,6 +99,7 @@ public sealed partial class CreatedPage : Page, IRefreshableView, ISearchableVie
 	public void ClearSearch()
 	{
 		TracksGrid.ItemsSource = Tracks;
+		_ = UpdateTrackCount((uint)Tracks.Count);
 	}
 
 	public async Task<List<string>?> Search(string query)
@@ -56,17 +108,17 @@ public sealed partial class CreatedPage : Page, IRefreshableView, ISearchableVie
 		{
 			var searchItems = new ObservableCollection<Track>();
 			// If query IsFinite, fetch track by ID (could be hidden):
-			var hasID = int.TryParse(query, out var id);
+			var hasID = ulong.TryParse(query, out var id);
 			if (query.Length > 3 &&
 				hasID &&
 				!Tracks.Any(track => track.ID == id))
 			{
 				try
 				{
-					var top = await REST.GetAsync<TrackAPIResponse>(Endpoints.TrackData(id));
+					var top = await REST.GetAsync<TrackAPIResponse>(Routes.TrackData(id));
 					if (top?.Data?.Track is not TrackData track)
 						throw new Exception("Track not found");
-					if (track.AuthorID != App.User!.ID)
+					if (track.AuthorID != this.User!.ID)
 						throw new Exception("Track author is not current user");
 
 					searchItems.Add(new CreatedTrack(track));
@@ -85,6 +137,7 @@ public sealed partial class CreatedPage : Page, IRefreshableView, ISearchableVie
 			}
 
 			TracksGrid.ItemsSource = searchItems;
+			_ = UpdateTrackCount((uint)searchItems.Count);
 		}
 
 		return null;
@@ -486,7 +539,7 @@ public sealed partial class CreatedPage : Page, IRefreshableView, ISearchableVie
 			var result = await confirmDialog.ShowAsync();
 			if (result == ContentDialogResult.Primary)
 			{
-				await track.Delete();
+				await track.Delete(Session.RestExtended);
 				Tracks.Remove(track);
 			}
 		}
@@ -550,18 +603,18 @@ public sealed partial class CreatedPage : Page, IRefreshableView, ISearchableVie
 
 	private async Task RefreshTracksAsync()
 	{
-		var response = await REST.GetAsync<UserPageResponse>(App.User!.Name);
+		var response = await REST.GetAsync<UserPageTracksResponse>(Routes.UserTracks(this.User!.Name));
 
 		Tracks.Clear();
 
-		var tracks = response?.CreatedTracks?.Data;
+		var tracks = response?.Data;
 		if (tracks is null)
 			return;
 
 		foreach (var trackData in tracks)
 			Tracks.Add(new CreatedTrack(trackData));
 
-		this.TrackCount.Text = $"{Tracks.Count} tracks";
+		_ = UpdateTrackCount((uint)Tracks.Count);
 	}
 
 	private async void RefreshContainer_RefreshRequested(RefreshContainer sender, RefreshRequestedEventArgs args)

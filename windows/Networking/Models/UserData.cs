@@ -2,26 +2,51 @@ using System.Text.Json.Serialization;
 
 namespace AccountCentre.Networking.Models;
 
+using Converters;
+
 public record UserData
 {
 	[JsonPropertyName("u_id")]
-	public int ID { get; init; }
+	public ulong ID { get; init; }
+
 	[JsonPropertyName("u_name")]
 	public string Name { get; init; } = "";
+
 	[JsonPropertyName("d_name")]
 	public string DisplayName { get; init; } = "";
-	[JsonPropertyName("img_url_medium")]
+
+	[JsonPropertyName("img_url")]
 	public string? AvatarURL { get; init; }
+
+	[JsonInclude]
+	[JsonPropertyName("img_url_small")]
+	private string ImgURLSmall
+	{
+		init => AvatarURL = value;
+	}
+
+	[JsonInclude]
+	[JsonPropertyName("img_url_medium")]
+	private string ImgURLMedium
+	{
+		init => AvatarURL = value;
+	}
+
 	[JsonPropertyName("forum_url")]
 	public string? ForumURL { get; init; }
+
 	[JsonPropertyName("current_user")]
 	public bool IsCurrentUser { get; init; }
+
 	[JsonPropertyName("classic")]
 	public bool IsOfficialAuthor { get; init; }
+
 	[JsonPropertyName("moderator")]
 	public bool IsModerator { get; init; }
+
 	[JsonPropertyName("admin")]
 	public bool IsAdmin { get; init; }
+
 	[JsonPropertyName("cosmetics")]
 	public UserCosmeticsData? Cosmetics { get; init; }
 
@@ -91,12 +116,15 @@ public class UserInfoData
 public sealed class UserMobileStatsData
 {
 	[JsonPropertyName("lvl")]
+	[JsonConverter(typeof(DashAsDefaultUInt32Converter))]
 	[JsonNumberHandling(JsonNumberHandling.AllowReadingFromString)]
 	public uint Level { get; init; }
 	[JsonPropertyName("wins")]
+	[JsonConverter(typeof(DashAsDefaultUInt32Converter))]
 	[JsonNumberHandling(JsonNumberHandling.AllowReadingFromString)]
 	public uint Wins { get; init; }
 	[JsonPropertyName("headCount")]
+	[JsonConverter(typeof(DashAsDefaultUInt32Converter))]
 	[JsonNumberHandling(JsonNumberHandling.AllowReadingFromString)]
 	public uint HeadCount { get; init; }
 	[JsonPropertyName("connected")]

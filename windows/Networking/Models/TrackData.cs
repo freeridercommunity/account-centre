@@ -13,32 +13,42 @@ public enum TrackVehicle
 public record TrackData : BaseData<TrackData>
 {
 	[JsonPropertyName("id")]
-	public int ID { get; private set; } = -1;
+	public ulong? ID { get; private set; }
+
 	[JsonPropertyName("title")]
+	[JsonConverter(typeof(StringOrNumberConverter))]
 	public string Title { get; init; } = "";
+
 	[JsonPropertyName("descr")]
 	public string Description { get; init; } = "";
+
 	[JsonPropertyName("vehicle")]
 	[JsonConverter(typeof(JsonStringEnumConverter))]
 	public TrackVehicle DefaultVehicle { get; init; }
+
 	[JsonPropertyName("vehicles")]
 	public string[]? AllowedVehicleNames { get; init; }
+
 	[JsonIgnore]
 	public TrackVehicle[]? AllowedVehicles =>
 		AllowedVehicleNames?.Select(Enum.Parse<TrackVehicle>).ToArray();
 
 	// Author stuff
 	[JsonPropertyName("u_id")]
-	public int? AuthorID { get; init; }
+	public ulong? AuthorID { get; init; }
+
 	[JsonPropertyName("author_is_user")]
 	public bool IsAuthorUser { get; init; }
+
 	[JsonPropertyName("u_url")]
 	public string? AuthorName { get; init; }
+
 	[JsonPropertyName("author")]
 	public string AuthorDisplayName { get; init; } = "";
 
 	[JsonPropertyName("featured")]
 	public bool IsFeatured { get; init; }
+
 	[JsonPropertyName("hide")]
 	[JsonConverter(typeof(BoolConverter))]
 	public bool IsHidden { get; init; }
@@ -48,6 +58,7 @@ public record TrackData : BaseData<TrackData>
 	[JsonInclude]
 	[JsonPropertyName("url")]
 	private string Url { init => InferID(value); }
+
 	[JsonInclude]
 	[JsonPropertyName("slug")]
 	private string Slug { init => InferID(value); }
@@ -97,13 +108,12 @@ public record TrackData : BaseData<TrackData>
 
 	private void InferID(string? value)
 	{
-		if (value == null || ID != -1)
+		if (value == null || ID != null)
 			return;
 
 		var index = value.IndexOf('-');
-
 		if (index > 0)
-			ID = int.Parse(value[..index]);
+			ID = ulong.Parse(value[..index]);
 	}
 }
 

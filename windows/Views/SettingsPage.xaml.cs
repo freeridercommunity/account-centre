@@ -1,73 +1,52 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Navigation;
+// using Microsoft.Windows.BadgeNotifications;
 using System.Diagnostics;
 
 namespace AccountCentre.Views;
 
-using AccountCentre.Networking.ExtendedAPI;
-using Components;
+using Components.Dialogs;
 using Core;
+using Core.Sessions;
 using Core.Settings;
+using Core.Storage;
+using Interfaces;
 using Models;
 
-public sealed partial class SettingsPage : Page
+public sealed partial class SettingsPage : Page, ISessionAware
 {
-	// Bugged: Can't use x:Bind Settings.Property
-	private AppSettings Settings => SettingsManager.Current;
-	private bool CheckForUpdatesAtStartup
+	public AppSettings Settings => SettingsManager.Current;
+	public Session Session { get; set; } = null!;
+	private int StartupAccountBehaviorIndex
 	{
-		get => Settings.CheckForUpdatesAtStartup;
-		set => Settings.CheckForUpdatesAtStartup = value;
+		get => Settings.StartupAccountBehavior;
+		set
+		{
+			if (value >= 0)
+				Settings.StartupAccountBehavior = (ushort)value;
+		}
 	}
-
-	private bool AutoDownloadUpdates
-	{
-		get => Settings.AutoDownloadUpdates;
-		set => Settings.AutoDownloadUpdates = value;
-	}
-
-	private bool DeveloperMode
-	{
-		get => Settings.DeveloperMode;
-		set => Settings.DeveloperMode = value;
-	}
-
-	private string UpdateChannel
+	private int UpdateChannelIndex
 	{
 		get => Settings.UpdateChannel;
-		set => Settings.UpdateChannel = value;
-	}
-
-	private ClientUser CurrentUser => App.User!;
-	private sealed class BuildChannel
-	{
-		public string Name { get; set; } = "";
-		public string Value { get; set; } = "";
-		public bool IsEnabled { get; set; } = true;
-	}
-	private readonly BuildChannel[] UpdateChannels =
-	[
-		new()
+		set
 		{
-			Name = "Stable",
-			Value = "stable"
-		},
-		new()
-		{
-			Name = "Beta",
-			Value = "beta",
-			IsEnabled = false
+			if (value >= 0)
+				Settings.UpdateChannel = (ushort)value;
 		}
-	];
-
+	}
 	public SettingsPage()
 	{
+		this.NavigationCacheMode = NavigationCacheMode.Enabled;
+
 		InitializeComponent();
 
 		this.Version.Text = UpdateManager.CurrentVersion.ToString();
 		this.CheckForUpdatesCard.Description = $"Last checked: {UpdateManager.LastCheckedText}";
 
-		this.CacheDirectorySize.Text = CacheManager.SizeText;
+		this.CacheDirectorySize.Text = Utils.FormatBytes(CacheStore.Default.Size);
 
 		if (Directory.Exists(AppData.TempDirectory))
 		{
@@ -96,6 +75,66 @@ public sealed partial class SettingsPage : Page
 			_ = CheckForUpdates();
 	}
 
+	protected override void OnNavigatedTo(NavigationEventArgs e)
+	{
+		base.OnNavigatedTo(e);
+		if (Session?.User == null)
+			return;
+
+		InitializeUserSettings(Session.User);
+	}
+
+	private async void InitializeUserSettings(ClientUser user)
+	{
+		var config = await user.FetchConfig(Session.Rest);
+		if (config == null)
+			return;
+
+		this.NameChangesRemaining.Text = config.NameChangesRemaining.ToString();
+		this.NameChangeButton.IsEnabled = config.NameChangesRemaining > 0;
+	}
+
+	private void EditRow_Entered(object sender, PointerRoutedEventArgs e)
+	{
+		if (sender is Grid grid && grid.Children.LastOrDefault() is UIElement element)
+			element.Opacity = 1;
+	}
+
+	private void EditRow_Exited(object sender, PointerRoutedEventArgs e)
+	{
+		if (sender is Grid grid && grid.Children.LastOrDefault() is UIElement element)
+			element.Opacity = 0;
+	}
+
+	private async void ChangeAvatar_Click(object sender, RoutedEventArgs e)
+	{
+		if (sender is not Button button)
+			return;
+
+		button.IsEnabled = false;
+
+		try
+		{
+			var avatarDialog = new AvatarSelectDialog(Session)
+			{
+				XamlRoot = this.XamlRoot
+			};
+			await avatarDialog.ShowAsync();
+		}
+		catch (Exception ex)
+		{
+			var errorDialog = new ErrorDialog(ex.Message)
+			{
+				XamlRoot = this.XamlRoot
+			};
+			await errorDialog.ShowAsync();
+		}
+		finally
+		{
+			button.IsEnabled = true;
+		}
+	}
+
 	private async void ChangeUsername_Click(object sender, RoutedEventArgs e)
 	{
 		if (sender is not Button button)
@@ -105,52 +144,20 @@ public sealed partial class SettingsPage : Page
 
 		try
 		{
-			throw new Exception("Not implemented");
+			var authDialog = new ReauthenticateDialog(this.Session.Username)
+			{
+				XamlRoot = this.Content.XamlRoot
+			};
 
-			// var authDialog = new ReauthenticateDialog
-			// {
-			// 	XamlRoot = this.Content.XamlRoot
-			// };
+			var authResult = await authDialog.ShowAsync();
+			if (authResult != ReauthenticateDialogResult.Authenticated)
+				return;
 
-			// var authResult = await authDialog.ShowAsync();
-			// if (authResult != ReauthenticateDialogResult.Authenticated)
-			// 	return;
-
-			// var newUsername = new TextBox
-			// {
-			// 	PlaceholderText = "Enter new username"
-			// };
-
-			// var confirmNewUsername = new TextBox
-			// {
-			// 	PlaceholderText = "Re-enter new username"
-			// };
-
-			// var stackPanel = new StackPanel
-			// {
-			// 	Spacing = 8,
-			// 	Children =
-			// 	{
-			// 		newUsername,
-			// 		confirmNewUsername
-			// 	}
-			// };
-
-			// var dialog = new ContentDialog
-			// {
-			// 	XamlRoot = this.XamlRoot,
-			// 	Title = "Change Username",
-			// 	Content = stackPanel,
-			// 	PrimaryButtonText = "Save",
-			// 	IsPrimaryButtonEnabled = false,
-			// 	CloseButtonText = "Cancel"
-			// };
-
-			// var result = await dialog.ShowAsync();
-			// if (result == ContentDialogResult.Primary)
-			// {
-			// 	// await RESTExtended.PatchAsync(Endpoints.Username());
-			// }
+			var usernameDialog = new UsernameChangeDialog(Session)
+			{
+				XamlRoot = this.XamlRoot
+			};
+			await usernameDialog.ShowAsync();
 		}
 		catch (Exception ex)
 		{
@@ -175,7 +182,7 @@ public sealed partial class SettingsPage : Page
 
 		try
 		{
-			var authDialog = new ReauthenticateDialog
+			var authDialog = new ReauthenticateDialog(this.Session.Username)
 			{
 				XamlRoot = this.Content.XamlRoot
 			};
@@ -184,49 +191,12 @@ public sealed partial class SettingsPage : Page
 			if (authResult != ReauthenticateDialogResult.Authenticated)
 				return;
 
-			var password = authDialog.Password;
-			var newEmail = new TextBox
+			var emailDialog = new EmailChangeDialog(Session)
 			{
-				PlaceholderText = "Enter new email"
+				Password = authDialog.Password,
+				XamlRoot = this.XamlRoot
 			};
-
-			var confirmNewEmail = new TextBox
-			{
-				PlaceholderText = "Re-enter new email"
-			};
-
-			var stackPanel = new StackPanel
-			{
-				Spacing = 8,
-				Children =
-				{
-					newEmail,
-					confirmNewEmail
-				}
-			};
-
-			var dialog = new ContentDialog
-			{
-				XamlRoot = this.XamlRoot,
-				Title = "Change Email",
-				Content = stackPanel,
-				PrimaryButtonText = "Save",
-				IsPrimaryButtonEnabled = false,
-				CloseButtonText = "Cancel"
-			};
-
-			var result = await dialog.ShowAsync();
-			if (result == ContentDialogResult.Primary)
-			{
-				await RESTExtended.PatchAsync(
-					Endpoints.Email(),
-					new
-					{
-						email = newEmail.Text,
-						password
-					}
-				);
-			}
+			await emailDialog.ShowAsync();
 		}
 		catch (Exception ex)
 		{
@@ -251,7 +221,7 @@ public sealed partial class SettingsPage : Page
 
 		try
 		{
-			var authDialog = new ReauthenticateDialog
+			var authDialog = new ReauthenticateDialog(this.Session.Username)
 			{
 				XamlRoot = this.Content.XamlRoot
 			};
@@ -260,50 +230,92 @@ public sealed partial class SettingsPage : Page
 			if (authResult != ReauthenticateDialogResult.Authenticated)
 				return;
 
-			// var password = authDialog.Password;
-
-			var newPassword = new PasswordBox
+			var passwordDialog = new PasswordChangeDialog(Session)
 			{
-				PlaceholderText = "Enter new password"
+				Password = authDialog.Password,
+				XamlRoot = this.XamlRoot
+			};
+			await passwordDialog.ShowAsync();
+		}
+		catch (Exception ex)
+		{
+			var errorDialog = new ErrorDialog(ex.Message)
+			{
+				XamlRoot = this.XamlRoot
+			};
+			await errorDialog.ShowAsync();
+		}
+		finally
+		{
+			button.IsEnabled = true;
+		}
+	}
+
+	private async void UpdateForumPassword_Click(object sender, RoutedEventArgs e)
+	{
+		if (sender is not Button button)
+			return;
+
+		button.IsEnabled = false;
+
+		try
+		{
+			var authDialog = new ReauthenticateDialog(this.Session.Username)
+			{
+				XamlRoot = this.Content.XamlRoot
 			};
 
-			var confirmNewPassword = new PasswordBox
+			var authResult = await authDialog.ShowAsync();
+			if (authResult != ReauthenticateDialogResult.Authenticated)
+				return;
+
+			var passwordDialog = new ForumPasswordUpdateDialog(Session)
 			{
-				PlaceholderText = "Re-enter new password"
+				XamlRoot = this.XamlRoot
+			};
+			await passwordDialog.ShowAsync();
+		}
+		catch (Exception ex)
+		{
+			var errorDialog = new ErrorDialog(ex.Message)
+			{
+				XamlRoot = this.XamlRoot
+			};
+			await errorDialog.ShowAsync();
+		}
+		finally
+		{
+			button.IsEnabled = true;
+		}
+	}
+
+	private async void ClearSessions_Click(object sender, RoutedEventArgs e)
+	{
+		if (sender is not Button button)
+			return;
+
+		button.IsEnabled = false;
+
+		try
+		{
+			var authDialog = new ReauthenticateDialog(this.Session.Username)
+			{
+				XamlRoot = this.Content.XamlRoot
 			};
 
-			var stackPanel = new StackPanel
-			{
-				Spacing = 8,
-				Children =
-				{
-					newPassword,
-					confirmNewPassword
-				}
-			};
+			var authResult = await authDialog.ShowAsync();
+			if (authResult != ReauthenticateDialogResult.Authenticated)
+				return;
 
-			var dialog = new ContentDialog
+			await Session.RefreshToken(authDialog.Password);
+		}
+		catch (Exception ex)
+		{
+			var errorDialog = new ErrorDialog(ex.Message)
 			{
-				XamlRoot = this.XamlRoot,
-				Title = "Change Password",
-				Content = stackPanel,
-				PrimaryButtonText = "Save",
-				IsPrimaryButtonEnabled = false,
-				CloseButtonText = "Cancel"
+				XamlRoot = this.XamlRoot
 			};
-
-			var result = await dialog.ShowAsync();
-			if (result == ContentDialogResult.Primary)
-			{
-				try
-				{
-					// await change password
-				}
-				catch // (Exception ex)
-				{
-					
-				}
-			}
+			await errorDialog.ShowAsync();
 		}
 		finally
 		{
@@ -320,29 +332,11 @@ public sealed partial class SettingsPage : Page
 
 		try
 		{
-			CacheManager.Clear();
+			CacheStore.Default.Clear();
 		}
 		finally
 		{
 			button.IsEnabled = true;
-		}
-	}
-
-	private async void ToggleDeveloperMode_Toggle(object sender, RoutedEventArgs e)
-	{
-		if (sender is not ToggleSwitch toggle)
-			return;
-
-		toggle.IsEnabled = false;
-
-		try
-		{
-			SettingsManager.Current.DeveloperMode = toggle.IsOn;
-			SettingsManager.Save();
-		}
-		finally
-		{
-			toggle.IsEnabled = true;
 		}
 	}
 
@@ -443,59 +437,6 @@ public sealed partial class SettingsPage : Page
 		}
 	}
 
-	private void UpdateChannel_SelectionChanged(object sender, SelectionChangedEventArgs e)
-	{
-		if (sender is not ComboBox comboBox)
-			return;
-
-		comboBox.IsEnabled = false;
-
-		try
-		{
-			SettingsManager.Save();
-		}
-		finally
-		{
-			comboBox.IsEnabled = true;
-		}
-	}
-
-	private void AutoScanUpdates_Toggle(object sender, RoutedEventArgs e)
-	{
-		if (sender is not ToggleSwitch toggle)
-			return;
-
-		toggle.IsEnabled = false;
-
-		try
-		{
-			SettingsManager.Current.CheckForUpdatesAtStartup = toggle.IsOn;
-			SettingsManager.Save();
-		}
-		finally
-		{
-			toggle.IsEnabled = true;
-		}
-	}
-
-	private void AutoDownloadUpdates_Toggle(object sender, RoutedEventArgs e)
-	{
-		if (sender is not ToggleSwitch toggle)
-			return;
-
-		toggle.IsEnabled = false;
-
-		try
-		{
-			SettingsManager.Current.AutoDownloadUpdates = toggle.IsOn;
-			SettingsManager.Save();
-		}
-		finally
-		{
-			toggle.IsEnabled = true;
-		}
-	}
-
 	private async Task CheckForUpdates()
 	{
 		this.CheckForUpdatesButton.IsEnabled = false;
@@ -545,6 +486,7 @@ public sealed partial class SettingsPage : Page
 			Height = 14,
 			Width = 14
 		};
+		// BadgeNotificationManager.Current.SetBadgeAsGlyph(BadgeNotificationGlyph.Activity);
 
 		try
 		{
@@ -582,11 +524,13 @@ public sealed partial class SettingsPage : Page
 			this.UpdateStatusBar.Message = ex.Message;
 
 			this.DownloadUpdateButton.Content = "Retry";
+			// BadgeNotificationManager.Current.SetBadgeAsGlyph(BadgeNotificationGlyph.Error);
 		}
 		finally
 		{
 			this.UpdateProgressBar.Visibility = Visibility.Collapsed;
 			this.DownloadUpdateButton.IsEnabled = true;
+			// BadgeNotificationManager.Current.ClearBadge();
 		}
 	}
 }
