@@ -22,16 +22,16 @@ public record TrackData : BaseData<TrackData>
 	[JsonPropertyName("descr")]
 	public string Description { get; init; } = "";
 
-	[JsonPropertyName("vehicle")]
-	[JsonConverter(typeof(JsonStringEnumConverter))]
-	public TrackVehicle DefaultVehicle { get; init; }
+	// [JsonPropertyName("vehicle")]
+	// [JsonConverter(typeof(JsonStringEnumConverter))]
+	// public TrackVehicle DefaultVehicle { get; init; }
 
-	[JsonPropertyName("vehicles")]
-	public string[]? AllowedVehicleNames { get; init; }
+	// [JsonPropertyName("vehicles")]
+	// public string[]? AllowedVehicleNames { get; init; }
 
-	[JsonIgnore]
-	public TrackVehicle[]? AllowedVehicles =>
-		AllowedVehicleNames?.Select(Enum.Parse<TrackVehicle>).ToArray();
+	// [JsonIgnore]
+	// public TrackVehicle[]? AllowedVehicles =>
+	// 	AllowedVehicleNames?.Select(Enum.Parse<TrackVehicle>).ToArray();
 
 	// Author stuff
 	[JsonPropertyName("u_id")]
@@ -106,7 +106,7 @@ public record TrackData : BaseData<TrackData>
 	[JsonPropertyName("img_url_small")]
 	public string? AuthorAvatarURL { get; init; }
 
-	private void InferID(string? value)
+	private void InferID(string value)
 	{
 		if (value == null || ID != null)
 			return;

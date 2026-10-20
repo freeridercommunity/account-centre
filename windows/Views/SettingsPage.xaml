@@ -150,6 +150,11 @@
 							<ToggleSwitch IsOn="{x:Bind Settings.DeveloperMode, Mode=TwoWay}"/>
 						</controls:SettingsCard>
 
+						<controls:SettingsCard Header="WAF Passthrough"
+							Description="Attempt to pass through the web application firewall">
+							<ToggleSwitch IsOn="{x:Bind Settings.WAFPassthrough, Mode=TwoWay}"/>
+						</controls:SettingsCard>
+
 						<controls:SettingsCard x:Name="ClearTempCard" Header="Remove temporary files">
 							<controls:SettingsCard.Description>
 								<TextBlock>

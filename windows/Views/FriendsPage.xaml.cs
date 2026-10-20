@@ -25,10 +25,7 @@ public sealed partial class FriendsPage : Page, IRefreshableView, ISessionAware
 	public FriendsPage()
 	{
 		this.NavigationCacheMode = NavigationCacheMode.Enabled;
-
-		InitializeComponent();
-
-		_ = RefreshFriendsAsync();
+		this.InitializeComponent();
 	}
 
 	protected override void OnNavigatedTo(NavigationEventArgs e)

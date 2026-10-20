@@ -15,6 +15,7 @@ public sealed partial class AppSettings : INotifyPropertyChanged
 	private bool _saveLoginInfo = true;
 	private ushort _startupAccountBehavior = 0;
 	private ushort _updateChannel = 0;
+	private bool _wafPassthrough = true;
 
 	public bool AllowConcurrentSessions
 	{
@@ -62,6 +63,12 @@ public sealed partial class AppSettings : INotifyPropertyChanged
 	{
 		get => _updateChannel;
 		set => SetProperty(ref _updateChannel, value);
+	}
+
+	public bool WAFPassthrough
+	{
+		get => _wafPassthrough;
+		set => SetProperty(ref _wafPassthrough, value);
 	}
 
 	private void SetProperty<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)

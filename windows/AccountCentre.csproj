@@ -21,9 +21,12 @@
 
 		<SelfContained>true</SelfContained>
 		<WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
-		<WindowsPackageType>None</WindowsPackageType>
+		<!-- <WindowsPackageType>None</WindowsPackageType> -->
 
-		<Version>1.0.1</Version>
+		<Version>1.0.1.1</Version>
+
+		<!-- Enables targets that generate package layout, required for running with winapp run or msix packaging -->
+		<EnableMsixTooling>true</EnableMsixTooling>
 	</PropertyGroup>
 
 	<ItemGroup>

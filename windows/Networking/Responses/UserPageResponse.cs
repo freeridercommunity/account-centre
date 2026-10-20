@@ -43,7 +43,7 @@ public sealed class UserPageResponse : BasePageResponse
 public sealed class TracksData<T>
 {
 	[JsonPropertyName("tracks")]
-	public required T[] Data { get; init; }
+	public T[] Data { get; init; } = [];
 }
 
 public sealed class FriendsData<T>

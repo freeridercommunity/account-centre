@@ -27,10 +27,8 @@ public sealed partial class CreatedPage : Page, IRefreshableView, ISearchableVie
 {
 	public Session Session { get; set; } = null!;
 	public bool CanFilter => HasFeature || HasHidden;
-	public bool HasFeature =>
-		Tracks.Any(track => track.IsFeatured);
-	public bool HasHidden =>
-		Tracks.Any(track => track.IsHidden);
+	public bool HasFeature => Tracks.Any(track => track.IsFeatured);
+	public bool HasHidden => Tracks.Any(track => track.IsHidden);
 	public bool IsCurrentUser { get; private set; } = false;
 	public bool IsDeveloperModeEnabled => SettingsManager.Current.DeveloperMode;
 	private readonly Dictionary<ulong, ObservableCollection<CreatedTrack>> _trackCache = [];
@@ -39,16 +37,13 @@ public sealed partial class CreatedPage : Page, IRefreshableView, ISearchableVie
 	public CreatedPage()
 	{
 		this.NavigationCacheMode = NavigationCacheMode.Enabled;
-
-		InitializeComponent();
-
-		_ = RefreshTracksAsync();
+		this.InitializeComponent();
 	}
 
 	protected override void OnNavigatedTo(NavigationEventArgs e)
 	{
 		base.OnNavigatedTo(e);
-		if (e.Parameter is not ClientUser user)
+		if (e.Parameter is not User user)
 		{
 			this.User = null;
 			return;
@@ -603,18 +598,40 @@ public sealed partial class CreatedPage : Page, IRefreshableView, ISearchableVie
 
 	private async Task RefreshTracksAsync()
 	{
-		var response = await REST.GetAsync<UserPageTracksResponse>(Routes.UserTracks(this.User!.Name));
+		try
+		{
+			var response = await Session.Rest.GetAsync<UserPageTracksResponse>(Routes.UserTracks(this.User!.Name));
 
-		Tracks.Clear();
+			Tracks.Clear();
 
-		var tracks = response?.Data;
-		if (tracks is null)
-			return;
+			var tracks = response?.Data;
+			if (tracks is null)
+				return;
 
-		foreach (var trackData in tracks)
-			Tracks.Add(new CreatedTrack(trackData));
+			foreach (var trackData in tracks)
+				Tracks.Add(new CreatedTrack(trackData));
 
-		_ = UpdateTrackCount((uint)Tracks.Count);
+			_ = UpdateTrackCount((uint)Tracks.Count);
+		}
+		catch (HttpRequestException ex)
+		{
+			var dialog = new ErrorDialog(ex.Message)
+			{
+				DefaultButton = ContentDialogButton.Primary,
+				PrimaryButtonText = "Enable WAF Passthrough",
+				XamlRoot = this.XamlRoot
+			};
+			dialog.PrimaryButtonClick += (_, _) =>
+			{
+				SettingsManager.Current.WAFPassthrough = true;
+				_ = RefreshTracksAsync();
+			};
+			await dialog.ShowAsync();
+		}
+		catch (Exception ex)
+		{
+			System.Diagnostics.Debug.WriteLine(ex.Message);
+		}
 	}
 
 	private async void RefreshContainer_RefreshRequested(RefreshContainer sender, RefreshRequestedEventArgs args)

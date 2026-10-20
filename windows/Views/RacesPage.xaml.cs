@@ -35,10 +35,7 @@ public sealed partial class RacesPage : Page, IRefreshableView, ISearchableView,
 	public RacesPage()
 	{
 		this.NavigationCacheMode = NavigationCacheMode.Enabled;
-
-		InitializeComponent();
-
-		_ = RefreshRacesAsync();
+		this.InitializeComponent();
 	}
 
 	protected override void OnNavigatedTo(NavigationEventArgs e)
@@ -581,77 +578,119 @@ public sealed partial class RacesPage : Page, IRefreshableView, ISearchableView,
 		}
 	}
 
+	private static readonly SemaphoreSlim _dialogLock = new(1, 1);
 	private async void RacesGrid_ContainerContentChanging(ListViewBase sender, ContainerContentChangingEventArgs args)
 	{
 		if (args.InRecycleQueue ||
 			args.Item is not Race race)
 			return;
 
-		try
+		if (race.CreatedTimestamp is null)
 		{
-			if (race.CreatedTimestamp is null)
+			try
 			{
 				await race.FetchStats(Session.Rest);
 				race.OnPropertyChanged("CreatedTimeAgo");
 				race.OnPropertyChanged("CreatedTimestampLoaded");
 			}
-
-			if (!race.IsFeaturedLoaded)
+			catch (HttpRequestException ex)
 			{
-				try
+				await _dialogLock.WaitAsync();
+				if (!SettingsManager.Current.WAFPassthrough)
 				{
-					await race.FetchFeatured();
-					race.OnPropertyChanged("IsFeatured");
-				}
-				catch
-				{
-					// Show error on it "(X) Failed to load"
+					var dialog = new ErrorDialog(ex.Message)
+					{
+						DefaultButton = ContentDialogButton.Primary,
+						PrimaryButtonText = "Enable WAF Passthrough",
+						XamlRoot = this.XamlRoot
+					};
+					dialog.PrimaryButtonClick += (_, _) => SettingsManager.Current.WAFPassthrough = true;
+
+					try
+					{
+						await dialog.ShowAsync();
+					}
+					finally
+					{
+						_dialogLock.Release();
+					}
 				}
 			}
+			catch (Exception ex)
+			{
+				System.Diagnostics.Debug.WriteLine(ex.Message);
+				// Show error inline
+				// (x) Error: ex.Message
+			}
+		}
 
-			if (race.Track != null)
-				_ = race.Track.CacheThumbnailAsync();
-		}
-		catch (Exception ex)
+		if (!race.IsFeaturedLoaded)
 		{
-			System.Diagnostics.Debug.WriteLine(ex.Message);
-			// Show error inline
-			// (x) Error: ex.Message
+			try
+			{
+				await race.FetchFeatured();
+				race.OnPropertyChanged("IsFeatured");
+			}
+			catch
+			{
+				// Show error on it "(X) Failed to load"
+			}
 		}
+
+		if (race.Track != null)
+			_ = race.Track.CacheThumbnailAsync();
 	}
 
 	private async Task RefreshRacesAsync()
 	{
-		var response = await REST.GetAsync<UserPageRacesResponse>(Routes.UserRaces(this.User!.Name));
+		try
+		{
+			var response = await Session.Rest.GetAsync<UserPageRacesResponse>(Routes.UserRaces(this.User!.Name));
 
-		Races.Clear();
+			Races.Clear();
 
-		var recentlyCompleted = response?.Data;
-		if (recentlyCompleted is null)
-			return;
+			var recentlyCompleted = response?.Data;
+			if (recentlyCompleted is null)
+				return;
 
-		var races = (await Task.WhenAll(
-			recentlyCompleted.Select(async track =>
+			var races = (await Task.WhenAll(
+				recentlyCompleted.Select(async track =>
+				{
+					var response = await REST.GetAsync<APIResponse<RaceEntryData[]>>(
+						Routes.RaceData((ulong)track.ID!, this.User!.ID));
+
+					var race = response?.Data?.FirstOrDefault();
+					race?.Track = track;
+					return race;
+				})
+			))
+			.OfType<RaceEntryData>()
+			.ToArray();
+
+			foreach (var data in races)
+				Races.Add(new Race(data));
+
+			_ = UpdateRaceCount((uint)Races.Count);
+		}
+		catch (HttpRequestException ex)
+		{
+			var dialog = new ErrorDialog(ex.Message)
 			{
-				var response = await REST.GetAsync<APIResponse<RaceEntryData[]>>(
-					Routes.RaceData((ulong)track.ID!, this.User!.ID)
-				);
-
-				var race = response?.Data?.FirstOrDefault();
-
-				if (race != null)
-					race.Track = track;
-
-				return race;
-			})
-		))
-		.OfType<RaceEntryData>()
-		.ToArray();
-
-		foreach (var data in races)
-			Races.Add(new Race(data));
-
-		_ = UpdateRaceCount((uint)Races.Count);
+				DefaultButton = ContentDialogButton.Primary,
+				PrimaryButtonText = "Enable WAF Passthrough",
+				XamlRoot = this.XamlRoot
+			};
+			dialog.PrimaryButtonClick += (_, _) =>
+			{
+				SettingsManager.Current.WAFPassthrough = true;
+				_ = RefreshRacesAsync();
+			};
+			await dialog.ShowAsync();
+		}
+		catch (Exception ex)
+		{
+			System.Diagnostics.Debug.WriteLine(ex.Message);
+		}
 	}
 
 	private async void RefreshContainer_RefreshRequested(RefreshContainer sender, RefreshRequestedEventArgs args)
