@@ -18,6 +18,8 @@ public sealed class DashAsDefaultUInt32Converter : JsonConverter<uint>
 
 			if (uint.TryParse(value, out var result))
 				return result;
+
+			return 0;
 		}
 
 		throw new JsonException();

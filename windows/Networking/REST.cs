@@ -51,6 +51,61 @@ public static class REST
 		return await response.Content.ReadFromJsonAsync<T>();
 	}
 
+	public static async Task<string?> GetWAFToken(Uri? requestUri = null)
+	{
+		if (requestUri == null)
+			requestUri = new Uri(BaseURL);
+		else if (requestUri.Host != Host && requestUri.Host	!= "frhd.kanoapps.com")
+			throw new Exception($"Invalid host; must be one of: {Host}, frhd.kanoapps.com");
+
+		TaskCompletionSource<string?> token = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+		WebView2 webView = new();
+		await webView.EnsureCoreWebView2Async();
+		// string result = await webView.ExecuteScriptAsync("""
+		// 	(async () => {
+		// 		return await AwsWafIntegration.getToken();
+		// 	})()
+		// 	""");
+
+		webView.CoreWebView2.AddWebResourceRequestedFilter("*", CoreWebView2WebResourceContext.Document);
+		webView.CoreWebView2.WebResourceRequested += async (sender, e) =>
+		{
+			string eventUri = e.Request.Uri;
+			if (!string.Equals(eventUri, requestUri.AbsoluteUri, StringComparison.OrdinalIgnoreCase) ||
+				!e.Request.Headers.Contains("Cookie"))
+				return;
+
+			string cookie = e.Request.Headers.GetHeader("Cookie");
+			if (string.IsNullOrEmpty(cookie))
+				return;
+
+			var wafCookie = (await webView.CoreWebView2.CookieManager
+				.GetCookiesAsync(e.Request.Uri))
+				.FirstOrDefault(c => c.Name == "aws-waf-token");
+			if (wafCookie != null)
+			{
+				token.TrySetResult(wafCookie.Value);
+				webView.Close();
+			}
+		};
+
+		// webView.CoreWebView2.AddWebResourceRequestedFilter("*",	CoreWebView2WebResourceContext.Fetch | CoreWebView2WebResourceContext.Script);
+		// webView.CoreWebView2.WebResourceResponseReceived += async (sender, e) =>
+		// {
+		// 	if (e.Request.Method != "POST") return;
+
+		// 	System.Diagnostics.Debug.WriteLine($"WAFResponse: {e.Response.StatusCode} {e.Request.Uri}");
+
+		// 	using var content = await e.Response.GetContentAsync();
+		// 	// Parse json
+		// 	// data.token
+		// };
+
+		webView.Source = requestUri;
+		return await token.Task;
+	}
+
 	public sealed class Session
 	{
 		private string? _token;
@@ -118,51 +173,13 @@ public static class REST
 				response.Headers.TryGetValues("X-Amzn-Waf-Action", out var values) &&
 				values.Any(v => v.Equals("challenge", StringComparison.OrdinalIgnoreCase)))
 			{
+				response.Dispose();
 				if (!SettingsManager.Current.WAFPassthrough)
 					throw new HttpRequestException(
 						"This endpoint is protected by AWS WAF, and WAF passthrough is disabled.");
 
-				TaskCompletionSource<string?> token = new(TaskCreationOptions.RunContinuationsAsynchronously);
+				var wafToken = await GetWAFToken(request.RequestUri) ?? throw new HttpRequestException("Failed to pass through AWS WAF");;
 
-				WebView2 webView = new();
-				await webView.EnsureCoreWebView2Async();
-				// string result = await webView.ExecuteScriptAsync("""
-				// 	(async () => {
-				// 		return await AwsWafIntegration.getToken();
-				// 	})()
-				// 	""");
-
-				webView.CoreWebView2.AddWebResourceRequestedFilter("*", CoreWebView2WebResourceContext.Document);
-				webView.CoreWebView2.WebResourceRequested += async (sender, e) =>
-				{
-					if (e.Request.Uri != request.RequestUri!.ToString() ||
-						string.IsNullOrEmpty(e.Request.Headers.GetHeader("Cookie"))) return;
-
-					var wafCookie = (await webView.CoreWebView2.CookieManager
-						.GetCookiesAsync(e.Request.Uri))
-						.FirstOrDefault(c => c.Name == "aws-waf-token");
-					if (wafCookie != null)
-					{
-						token.TrySetResult(wafCookie.Value);
-						webView.Close();
-					}
-				};
-
-				// webView.CoreWebView2.AddWebResourceRequestedFilter("*",	CoreWebView2WebResourceContext.Fetch | CoreWebView2WebResourceContext.Script);
-				// webView.CoreWebView2.WebResourceResponseReceived += async (sender, e) =>
-				// {
-				// 	if (e.Request.Method != "POST") return;
-
-				// 	System.Diagnostics.Debug.WriteLine($"WAFResponse: {e.Response.StatusCode} {e.Request.Uri}");
-
-				// 	using var content = await e.Response.GetContentAsync();
-				// 	// Parse json
-				// 	// data.token
-				// };
-
-				webView.Source = request.RequestUri;
-
-				var wafToken = await token.Task ?? throw new HttpRequestException("Failed to pass through AWS WAF");
 				Client.DefaultRequestHeaders.Remove("x-aws-waf-token");
 				Client.DefaultRequestHeaders.TryAddWithoutValidation("x-aws-waf-token", wafToken);
 
